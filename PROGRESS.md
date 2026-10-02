@@ -12,7 +12,7 @@ Import commit: 5ddf473
 - Working tree: clean
 - Offline suite: 100 passed at 700f26d; verify_package passed: verification/package-20261002T082846Z.json
 - Next action: owner runs sudo -v and the doctor in a real terminal outside the agent shell, then reports the report path; read it and judge it against section 11.3
-- Blocked on: owner: doctor attempt 1 (verification/doctor-20261002T082941Z.json) ran in the agent shell and stopped at the first sudo -n ("interactive authentication is required"; section 12.1 stop point); no lease, no bk-* unit; rerun from a terminal that has run sudo -v
+- Blocked on: owner: doctor attempts 1 and 2 (verification/doctor-20261002T082941Z.json, doctor-20261002T083001Z.json) ran through the agent shell (`!` input), where sudo -n has no cached credential (sudo timestamps are per terminal); both stopped at the first sudo -n with no lease and no state change; the owner must type the command directly into the terminal pane where sudo -v succeeded
 
 ## Step log
 | Step | Status | Commit | Note |
@@ -26,7 +26,7 @@ Import commit: 5ddf473
 | 7 Profiles and host config | done | 934adfa | |
 | 8 Tests | done | c92e17f | 6.12 verify_package edits included | |
 | 9 CLI | done | b43a79e | setup_host 6.10 and tests 877, 902 included | |
-| 10 Doctor | blocked | 700f26d | attempt 1 refused by sudo -n in the agent shell; rerun in the owner terminal |
+| 10 Doctor | blocked | 700f26d | attempts 1-2 refused by sudo -n in the agent shell; rerun typed directly in the owner terminal |
 | 11 Live acceptance | pending | | owner present |
 | 12 README | pending | | |
 | 13 Provenance final pass | pending | | |
