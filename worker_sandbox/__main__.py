@@ -66,7 +66,8 @@ def login(profile: profiles.AgentProfile) -> dict:
             raise c.ContractError('login runs outside any run; finish or recover the leased run first')
         NativeRuntime.verify_model(profile.binary, None)
         staging = control / 'credentials' / profile.name
-        for path in (staging.parent, staging):
+        # As native_login did: the agent's state directory exists before the agent starts.
+        for path in (staging.parent, staging, *((staging / profile.config_subdir,) if profile.config_subdir else ())):
             path.mkdir(mode=0o700, exist_ok=True)
             info = path.lstat()
             if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:

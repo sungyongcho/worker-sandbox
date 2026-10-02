@@ -24,6 +24,7 @@ Verbatim import commit in this repository: 5ddf473.
 | worker_sandbox/profiles.py | new (Codex facts from benchkit/adapters.py L12, L96-99, L177-184, L265-267 and runtime.py L69-73) | | |
 | worker_sandbox/hostconfig.py | new | | |
 | tests/test_profiles.py | new | | |
+| tests/acceptance/empty/README.md | new (section 11.4) | | |
 | tests/test_cli.py | new (preflight idea from tests/test_native_preparation.py L79) | | |
 | worker_sandbox/__main__.py | new (modeled on benchkit/__main__.py: argparse, dispatch, exit codes 0/1/2/130) | | |
 | Makefile | Makefile | 1-9 | none |
@@ -117,6 +118,7 @@ Verbatim import commit in this repository: 5ddf473.
 - step 8: 1069, 1075: unit User food-delivery -> worker-sandbox
 - step 8: 1150: deleted the handle_payments patch line (L1160)
 - step 9: 877 login_imports_a_validated_credential_from_a_private_staging_home re-added, adapted to worker_sandbox.__main__.login: a fake login argv writes .codex/auth.json into credentials/codex; staging and its parent are 0700; status argv runs second; a claim then seeds exactly the credential file
+- step 11: 877: asserts CODEX_HOME exists with 0700 when the login argv runs (login now creates it, as native_login did)
 - step 9: 902 login_failures_leave_the_vault_unchanged re-added, adapted: a failing login argv leaves the staged files unchanged; login under a lease runs no subprocess
 
 ## test_bulk_transfer.py

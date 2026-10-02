@@ -159,3 +159,10 @@ whose signature now requires a profile.
 Did instead: rewrote the two docstring sentences, renamed the three literals (private-controller-canary,
 worker-sandbox-write-probe, worker-sandbox-host-check-) and passed the profile to the second NativeRuntime.
 Every check, its order and its pass criterion are unchanged. tests/test_cli.py DoctorTests imports the module offline.
+
+## 2026-10-02 worker_sandbox/__main__.py:69
+Expected: login runs "exactly like `native_login` L94-100" (6.9).
+Observed: native_login created the staging `.codex` directory first (runtime.py L95 at 8bb76be); the step 9 login did not,
+so CODEX_HOME pointed at a missing directory. Found by review before live acceptance, not by a failing run.
+Did instead: login creates `<staging>/<config_subdir>` with mode 0700 when the profile has one. Test 877 now asserts the
+directory exists with 0700 when the agent starts.
