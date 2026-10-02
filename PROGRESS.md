@@ -6,12 +6,12 @@ Repository: <worker-sandbox>
 Import commit: 5ddf473
 
 ## State
-- Current step: 3 Contracts subset
+- Current step: 4 Remove the payment fixture
 - Status: in progress
-- Last commit: 5ddf473 chore: import sandbox modules verbatim from worker-benchmark-kit 8bb76be
+- Last commit: this commit refactor: keep only the runtime contracts
 - Working tree: clean
-- Offline suite: not run since 5ddf473 (package does not import until step 3)
-- Next action: cut worker_sandbox/contracts.py to the section 6.1 subset, record it in PROVENANCE.md, run the suite
+- Offline suite: 2 passed, 2 import errors (tests still import benchkit until step 8) at this commit; run from the repository root with .venv/bin/python -I -B -m unittest discover -s tests
+- Next action: read the payment hunks of runtime.py, worker_files.py and worker_service.py, apply the section 12 step 4 deletions only, record them, run the suite
 - Blocked on: none
 
 ## Step log
@@ -19,8 +19,8 @@ Import commit: 5ddf473
 | --- | --- | --- | --- |
 | 1 Scaffold | done | d6b35ec | |
 | 2 Verbatim import | done | 5ddf473 | import commit holds only the copies (R1); its hash is recorded in a following docs commit |
-| 3 Contracts subset | in progress | | |
-| 4 Remove the payment fixture | pending | | |
+| 3 Contracts subset | done | this commit | |
+| 4 Remove the payment fixture | in progress | | |
 | 5 Remove evidence and vault features | pending | | |
 | 6 Parameterize | pending | | |
 | 7 Profiles and host config | pending | | |
