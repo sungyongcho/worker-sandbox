@@ -267,3 +267,16 @@ Expected: setup-rootless creates worker_root "through the bridge (inner 1000 cre
 Observed: inner 1000 (host sub-UID) cannot create a directory in a controller-owned parent.
 Did instead: provision() has inner root create the directory and chown it to inner 1000 in one `unshare --user <map>`
 call; the host owner is the sub-UID base, mode 0700 (measured: 700 100000:100000, the controller cannot list it).
+
+## 2026-10-02 worker_sandbox/__main__.py:39 choosing the host config (stage 2 step 5)
+Expected: "after `hostconfig.read()`, choose `RootlessRuntime` when `spec.mode == 'rootless'`" (5.4), with hostconfig.py unchanged (S1)
+and the doctor and live commands of sections 6 and 7.3 carrying no mode option.
+Observed: hostconfig.read() reads only the root-mode control root, and this host has a root-mode host.json there, so those
+commands would always run root mode.
+Did instead: host_spec() uses this user's rootless host.json (`$XDG_STATE_HOME/worker-sandbox/controller/host.json`, written
+only by setup-rootless) when it exists, else hostconfig.read(); `WORKER_SANDBOX_MODE=root` forces root mode. login, run,
+recover and the doctor use it. The code default stays root (`RuntimeSpec.mode = "root"`); a user switches to rootless by
+running setup-rootless. Owner to confirm, or choose an explicit option instead.
+Provisioned on this host (no root): `worker-sandbox setup-rootless` created ~/.local/state/worker-sandbox/controller (0700,
+controller) with host.json (mode rootless, sub-UID/GID 100000), /var/tmp/worker-sandbox-<user> (0711) and its worker root
+(0700, 100000:100000).

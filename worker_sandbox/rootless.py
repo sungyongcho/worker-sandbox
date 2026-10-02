@@ -51,13 +51,32 @@ def sub_base(path: str, user: str) -> int:
     raise ContractError(f'{path} has no subordinate range for {user}; add one as root')
 
 
+def default_control_root() -> Path:
+    state = Path(os.environ.get('XDG_STATE_HOME') or Path.home() / '.local/state')
+    return state / 'worker-sandbox/controller'
+
+
 def default_spec() -> RuntimeSpec:
     """Rootless defaults: the control root in the user's state directory, the worker root outside HOME."""
     user = pwd.getpwuid(os.getuid()).pw_name
-    state = Path(os.environ.get('XDG_STATE_HOME') or Path.home() / '.local/state')
-    return make(RuntimeSpec, account=user, mode='rootless', control_root=str(state / 'worker-sandbox/controller'),
+    return make(RuntimeSpec, account=user, mode='rootless', control_root=str(default_control_root()),
                 worker_root=f'/var/tmp/worker-sandbox-{user}/worker',
                 subuid_base=sub_base('/etc/subuid', user), subgid_base=sub_base('/etc/subgid', user))
+
+
+def check_host() -> dict:
+    """Host prerequisites of rootless mode that need no provisioned roots."""
+    for binary in BINARIES:
+        if not os.access(binary, os.X_OK):
+            raise ContractError(f'rootless mode requires {binary}')
+    for helper in BINARIES[2:4]:
+        info = os.stat(helper)
+        if info.st_uid != 0 or not info.st_mode & stat.S_ISUID:
+            raise ContractError(f'{helper} must be setuid root')
+    restricted = APPARMOR.exists() and APPARMOR.read_text().strip() == '1'
+    if restricted and not BWRAP_PROFILE.is_file():
+        raise ContractError(f'AppArmor restricts user namespaces and {BWRAP_PROFILE} is missing')
+    return {'apparmor_restricted': restricted}
 
 
 def mapping(spec: RuntimeSpec) -> list[str]:
@@ -127,16 +146,7 @@ class RootlessRuntime(NativeRuntime):
         ranges = {path: sub_base(path, user) for path in ('/etc/subuid', '/etc/subgid')}
         if (ranges['/etc/subuid'], ranges['/etc/subgid']) != (self.spec.subuid_base, self.spec.subgid_base):
             raise ContractError('host.json subordinate bases differ from /etc/subuid and /etc/subgid')
-        for binary in BINARIES:
-            if not os.access(binary, os.X_OK):
-                raise ContractError(f'rootless mode requires {binary}')
-        for helper in BINARIES[2:4]:
-            info = os.stat(helper)
-            if info.st_uid != 0 or not info.st_mode & stat.S_ISUID:
-                raise ContractError(f'{helper} must be setuid root')
-        restricted = APPARMOR.exists() and APPARMOR.read_text().strip() == '1'
-        if restricted and not BWRAP_PROFILE.is_file():
-            raise ContractError(f'AppArmor restricts user namespaces and {BWRAP_PROFILE} is missing')
+        restricted = check_host()['apparmor_restricted']
         for path, uid, mode in ((self.control, os.getuid(), None), (Path(self.spec.worker_root), self.spec.subuid_base, 0o700),
                                 (self.run.parent.parent, os.getuid(), None)):
             info = path.lstat()

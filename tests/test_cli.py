@@ -226,6 +226,61 @@ class RecoverTests(unittest.TestCase):
         self.assertEqual((result['units_stopped'], result['account_quiet']), (True, True))
 
 
+class RootlessSelectionTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.control = Path(temporary.name) / 'state/worker-sandbox/controller'
+        self.spec = c.validate({'account': 'tester', 'mode': 'rootless', 'subuid_base': 100000, 'subgid_base': 100000,
+                                'control_root': str(self.control), 'worker_root': str(Path(temporary.name) / 'w/worker')},
+                               c.RuntimeSpec)
+        default = patch.object(cli.rootless, 'default_control_root', return_value=self.control)
+        default.start()
+        self.addCleanup(default.stop)
+
+    def test_setup_rootless_parses_without_arguments(self):
+        self.assertEqual(cli.parse(['setup-rootless']).command, 'setup-rootless')
+
+    def test_runtime_class_follows_the_spec_mode(self):
+        self.assertIs(cli.runtime_class(c.RuntimeSpec()), cli.NativeRuntime)
+        self.assertIs(cli.runtime_class(self.spec), cli.rootless.RootlessRuntime)
+
+    def test_host_spec_prefers_this_users_rootless_config(self):
+        root_spec = c.RuntimeSpec()
+        with patch.object(cli.hostconfig, 'read', return_value=root_spec) as read, patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('WORKER_SANDBOX_MODE', None)
+            self.assertIs(cli.host_spec(), root_spec)
+            read.assert_called_once_with()
+        self.control.mkdir(parents=True, mode=0o700)
+        hostconfig.write(self.spec)
+        os.environ.pop('WORKER_SANDBOX_MODE', None)
+        self.assertEqual(cli.host_spec(), self.spec)
+        with patch.object(cli.hostconfig, 'read', return_value=root_spec), \
+             patch.dict(os.environ, {'WORKER_SANDBOX_MODE': 'root'}):
+            self.assertIs(cli.host_spec(), root_spec)
+
+    def test_setup_rootless_refuses_an_existing_host_config(self):
+        self.control.mkdir(parents=True, mode=0o700)
+        hostconfig.write(self.spec)
+        with patch.object(cli.rootless, 'default_spec', return_value=self.spec), \
+             patch.object(cli.rootless, 'provision') as provision, \
+             self.assertRaisesRegex(c.ContractError, 'exists'):
+            cli.setup_rootless(cli.parse(['setup-rootless']))
+        provision.assert_not_called()
+
+    def test_setup_rootless_provisions_then_records_the_spec(self):
+        self.control.parent.mkdir(parents=True)
+        def provision(spec):
+            Path(spec.control_root).mkdir(mode=0o700)
+            return {'control_root': spec.control_root, 'worker_root': spec.worker_root, 'worker_owner': 100000}
+        with patch.object(cli.rootless, 'default_spec', return_value=self.spec), \
+             patch.object(cli.rootless, 'check_host', return_value={'apparmor_restricted': True}), \
+             patch.object(cli.rootless, 'provision', side_effect=provision):
+            result = cli.setup_rootless(cli.parse(['setup-rootless']))
+        self.assertEqual(hostconfig.read(str(self.control)), self.spec)
+        self.assertEqual((result['worker_owner'], result['apparmor_restricted']), (100000, True))
+
+
 class DoctorTests(unittest.TestCase):
     def test_doctor_imports_and_never_overwrites_a_report(self):
         spec = importlib.util.spec_from_file_location('doctor_under_test', SETUP_HOST.parent / 'doctor.py')

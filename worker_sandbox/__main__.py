@@ -14,7 +14,7 @@ import uuid
 
 import msgspec
 
-from . import contracts as c, hostconfig, profiles
+from . import contracts as c, hostconfig, profiles, rootless
 from .artifacts import _manifest, atomic_write, safe_read, tree_manifest
 from .ownership import exclusive
 from .runtime import NativeRuntime, control_environment
@@ -36,6 +36,18 @@ def _tool(name: str):
     return module
 
 
+def host_spec() -> c.RuntimeSpec:
+    """This user's rootless host.json when setup-rootless created it, else the root-mode one; WORKER_SANDBOX_MODE=root forces root."""
+    control = rootless.default_control_root()
+    if os.environ.get('WORKER_SANDBOX_MODE') != 'root' and (control / hostconfig.NAME).exists():
+        return hostconfig.read(str(control))
+    return hostconfig.read()
+
+
+def runtime_class(spec: c.RuntimeSpec):
+    return rootless.RootlessRuntime if spec.mode == 'rootless' else NativeRuntime
+
+
 def agent(name: str, binary: str | None) -> profiles.AgentProfile:
     """The selected profile; without --binary, the agent is looked up on the worker's PATH."""
     if binary is None:
@@ -52,6 +64,16 @@ def setup_host(args) -> dict:
     return {'host': str(target), 'spec': hostconfig.read(args.control_root)}
 
 
+def setup_rootless(args) -> dict:
+    """Rootless provisioning, no root: a private control root and a sub-UID-owned worker root."""
+    spec = rootless.default_spec()
+    if hostconfig.path(spec.control_root).exists():
+        raise c.ContractError(f'{hostconfig.path(spec.control_root)} exists; inspect it rather than overwriting it')
+    checks = rootless.check_host()
+    created = rootless.provision(spec)
+    return {'host': str(hostconfig.write(spec)), 'spec': spec, **created, **checks}
+
+
 def doctor(args) -> dict:
     """The live host checks; the agent binary check runs only when --binary is given."""
     profile = PROFILES[args.profile](str(Path(args.binary).absolute()) if args.binary else '')
@@ -60,11 +82,12 @@ def doctor(args) -> dict:
 
 def login(profile: profiles.AgentProfile) -> dict:
     """The agent's own login in a private staging HOME; its files are never opened here."""
-    control = Path(hostconfig.read().control_root)
+    spec = host_spec()
+    control = Path(spec.control_root)
     with exclusive(control / 'owner.lock'):
         if (control / 'lease.json').exists():
             raise c.ContractError('login runs outside any run; finish or recover the leased run first')
-        NativeRuntime.verify_model(profile.binary, None)
+        runtime_class(spec).verify_model(profile.binary, None)
         staging = control / 'credentials' / profile.name
         # As native_login did: the agent's state directory exists before the agent starts.
         for path in (staging.parent, staging, *((staging / profile.config_subdir,) if profile.config_subdir else ())):
@@ -139,8 +162,10 @@ def execute(runtime, spec, run: Path, profile: profiles.AgentProfile, args, prom
     return result, profile.session_id(stdout)
 
 
-def run(args, prompt: bytes, *, build=NativeRuntime, verify=NativeRuntime.verify_model) -> dict:
-    spec = hostconfig.read()
+def run(args, prompt: bytes, *, build=None, verify=None) -> dict:
+    spec = host_spec()
+    build = build or runtime_class(spec)
+    verify = verify or runtime_class(spec).verify_model
     profile = agent(args.profile, args.binary)
     # Only the variables named with --env may cross; the profile lists which names are allowed.
     profile = msgspec.structs.replace(profile, credential_env=tuple(args.env))
@@ -163,9 +188,10 @@ def run(args, prompt: bytes, *, build=NativeRuntime, verify=NativeRuntime.verify
     return document
 
 
-def recover(run: Path, *, build=NativeRuntime) -> dict:
+def recover(run: Path, *, build=None) -> dict:
     """After a controller crash: stop this run's units, confirm no worker process, release its files."""
-    spec = hostconfig.read()
+    spec = host_spec()
+    build = build or runtime_class(spec)
     control = Path(spec.control_root)
     lease = control / 'lease.json'
     if lease.exists() and c.loads(safe_read(lease, control), dict) != {'run': str(Path(run).absolute())}:
@@ -188,6 +214,7 @@ def parser() -> argparse.ArgumentParser:
     setup.add_argument('--worker-root', default=defaults.worker_root)
     setup.add_argument('--control-root', default=defaults.control_root)
     setup.add_argument('--python', default=defaults.python)
+    commands.add_parser('setup-rootless', help='Provision rootless mode for this user; no root needed')
     doctor = commands.add_parser('doctor', help='Verify the host isolation live; needs sudo -v first')
     doctor.add_argument('--report', type=Path, required=True)
     doctor.add_argument('--profile', choices=sorted(PROFILES), default='generic')
@@ -227,6 +254,7 @@ def parse(argv=None):
 def dispatch(args):
     handlers = {
         'setup-host': lambda: setup_host(args),
+        'setup-rootless': lambda: setup_rootless(args),
         'doctor': lambda: doctor(args),
         'login': lambda: login(agent(args.profile, args.binary)),
         'run': lambda: run(args, sys.stdin.buffer.read()),
