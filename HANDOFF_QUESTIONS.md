@@ -166,3 +166,12 @@ Observed: native_login created the staging `.codex` directory first (runtime.py 
 so CODEX_HOME pointed at a missing directory. Found by review before live acceptance, not by a failing run.
 Did instead: login creates `<staging>/<config_subdir>` with mode 0700 when the profile has one. Test 877 now asserts the
 directory exists with 0700 when the agent starts.
+
+## 2026-10-02 worker_sandbox/profiles.py:105
+Brief 7.2 correction, measured at login. Expected: claude `credential_files` = ('.claude/.credentials.json', '.claude.json'),
+because "Whether it moves under CLAUDE_CONFIG_DIR is not stated" (7.2).
+Observed: `worker-sandbox login --profile claude` with claude 2.1.286 staged `.claude/.credentials.json` and
+`.claude/.claude.json` (both 0600) under CLAUDE_CONFIG_DIR; no `.claude.json` appeared directly in HOME. The second
+entry would always be skipped as missing.
+Did instead (owner approved): credential_files = ('.claude/.credentials.json', '.claude/.claude.json'); tests/test_profiles.py
+pins the credential files of every profile.

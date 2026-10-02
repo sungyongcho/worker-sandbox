@@ -81,6 +81,12 @@ class HomeEnvironmentTests(unittest.TestCase):
         self.assertEqual(codex(BINARY).home_environment('/w/home')['CODEX_HOME'], '/w/home/.codex')
         self.assertEqual(claude(BINARY).home_environment('/w/home')['CLAUDE_CONFIG_DIR'], '/w/home/.claude')
 
+    def test_credential_files_live_under_the_config_directory(self):
+        # Measured with claude 2.1.286 and codex 0.157.0 logins: every staged file sits in the config directory.
+        self.assertEqual(codex(BINARY).credential_files, ('.codex/auth.json',))
+        self.assertEqual(claude(BINARY).credential_files, ('.claude/.credentials.json', '.claude/.claude.json'))
+        self.assertEqual(generic(BINARY).credential_files, ())
+
     def test_profiles_validate_as_contracts(self):
         for profile in (codex(BINARY), claude(BINARY), generic(BINARY)):
             with self.subTest(profile=profile.name):

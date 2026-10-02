@@ -8,10 +8,10 @@ Import commit: 5ddf473
 ## State
 - Current step: 11 Live acceptance
 - Status: in progress
-- Last commit: 45b5732 docs(progress): record the passing codex login
+- Last commit: this commit fix(profiles): stage the claude global config from its config directory as login writes it
 - Working tree: clean
-- Offline suite: 100 passed after the login fix (pip install the repo into .venv before running)
-- Next action: with owner approval, fix the claude credential_files to (.claude/.credentials.json, .claude/.claude.json) per the measured login; then the codex and claude runs of section 11.4
+- Offline suite: 101 passed at this commit; verify_package passed: verification/package-20261002T083950Z.json
+- Next action: owner runs sudo -v and the codex hello.txt run of section 11.4 in a terminal tab; judge result.json, worker root and bk-* units
 - Blocked on: owner: interactive login and sudo -v for the runs (run through the terminal panel, never `!`)
 
 ## Step log

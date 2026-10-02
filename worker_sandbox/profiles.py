@@ -100,7 +100,7 @@ def codex(binary: str) -> AgentProfile:
 
 def claude(binary: str) -> AgentProfile:
     return AgentProfile(name='claude', binary=binary, config_env='CLAUDE_CONFIG_DIR', config_subdir='.claude',
-                        credential_files=('.claude/.credentials.json', '.claude.json'),
+                        credential_files=('.claude/.credentials.json', '.claude/.claude.json'),
                         credential_env=('ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'),
                         environment={'DISABLE_TELEMETRY': '1', 'DISABLE_ERROR_REPORTING': '1',
                                      'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC': '1'},
