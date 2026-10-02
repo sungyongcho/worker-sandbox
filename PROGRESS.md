@@ -47,13 +47,13 @@ Brief: <worker-benchmark>/SANDBOX_STAGE2_HANDOFF.md
 Base commit: bd84174
 
 ### State
-- Current step: 6 Doctor mode
+- Current step: 7 Live acceptance
 - Status: in progress
-- Last commit: this commit feat: add setup-rootless and the mode switch
+- Last commit: this commit docs(progress): record the passing rootless doctor
 - Working tree: clean
-- Offline suite: 122 passed at this commit
-- Next action: switch tools/doctor.py to host_spec and runtime_class with the rootless fixtures of 5.5, then run it live (no sudo)
-- Blocked on: none
+- Offline suite: 122 passed after the doctor fix
+- Next action: owner copies the staged credentials into the rootless control root (or logs in again); then run the codex and claude acceptance of 7.3 and the 7.4 MCP measurement
+- Blocked on: owner: credentials for the rootless control root
 
 ### Step log
 | Step | Status | Commit | Note |
@@ -62,8 +62,8 @@ Base commit: bd84174
 | 2 Reproduce M8 | done | 8603228 | m8 and runtime variants passed; /run needs the resolver bound at the symlink target | |
 | 3 Contracts | done | 7ae6eeb | stage 1 host.json byte test now compares the decoded spec | |
 | 4 Rootless runtime | done | bdcf8bc | worker root moved out of HOME; bridge without --mount-proc; setup-job launcher | |
-| 5 CLI and provisioning | done | this commit | host provisioned rootless; rootless host.json preferred when present | |
-| 6 Doctor mode | in progress | | |
-| 7 Live acceptance | pending | | |
+| 5 CLI and provisioning | done | dc40420 | host provisioned rootless; rootless host.json preferred when present | |
+| 6 Doctor mode | done | 2ababe6, 31bffdf (fix) | attempt 2 passed: verification/doctor-rootless-20261002T093518Z.json; attempt 1 failed on the worker root parent mode | |
+| 7 Live acceptance | blocked | | |
 | 8 README | pending | | |
 | 9 Provenance and progress | pending | | |
