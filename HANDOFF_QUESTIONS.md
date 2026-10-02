@@ -200,3 +200,18 @@ Owner decision: run-to-run resume is not supported in stage 1. No code change. T
 "not supported by design, not run" (the claude resume above is the evidence; the codex resume was not run). The argv
 position of --resume is covered offline by tests/test_profiles.py. The README states the limitation with its cause.
 Session preservation (evidence_directories) is a later-stage item; the brief is corrected in worker-benchmark after stage 1.
+
+# Stage 2
+
+## 2026-10-02 tools/probe_rootless.py (M8 reproduced)
+M8 reproduced on this host without root: verification/probe-rootless-m8-20261002T092217Z.json (Appendix A options
+exactly) and verification/probe-rootless-runtime-20261002T092238Z.json (plus the read-only /run tmpfs of section 4.1),
+both passed: inner uid 1000, gid 1000, no groups, CapEff 0, NoNewPrivs 1, /, /var and /run read-only, HOME and a host
+/tmp canary hidden, tap0 present, DNS and TLS to api.anthropic.com, every host IPv4 address, 10.0.2.2 and 127.0.0.1
+time out, host IPv6 addresses unreachable (slirp4netns has no IPv6 route), `nft flush ruleset` refused. The 5.3 rule
+set, including the ip6 lines, loads with `nft -f`. A controller-owned 0755 directory is not writable by the agent.
+Deviation needed for section 4.1's `--tmpfs /run --remount-ro /run`: on this host /etc/resolv.conf is a symlink to
+/run/systemd/resolve/stub-resolv.conf, so after the /run tmpfs bwrap fails with "Can't create file at
+/etc/resolv.conf". Did instead: bind the sandbox resolver at the symlink's target inside the new /run tmpfs
+(`--tmpfs /run --ro-bind <resolv.conf> <realpath of /etc/resolv.conf> --remount-ro /run`), falling back to
+/etc/resolv.conf when it does not point into /run. The runtime uses the same order.

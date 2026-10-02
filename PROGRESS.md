@@ -47,20 +47,20 @@ Brief: <worker-benchmark>/SANDBOX_STAGE2_HANDOFF.md
 Base commit: bd84174
 
 ### State
-- Current step: 2 Reproduce M8
+- Current step: 3 Contracts
 - Status: in progress
-- Last commit: this commit docs(progress): start stage 2 rootless mode
+- Last commit: this commit test: add the rootless reference probe
 - Working tree: clean
 - Offline suite: 101 passed at 66b9329 (stage 1)
-- Next action: commit this section, then port Appendix A into tools/probe_rootless.py and run it to reproduce M8 before any package code
+- Next action: add mode, subuid_base, subgid_base to RuntimeSpec (5.1) with tests
 - Blocked on: none
 
 ### Step log
 | Step | Status | Commit | Note |
 | --- | --- | --- | --- |
-| 1 Record the start | done | this commit | owner approved starting stage 2 and running the doctor and live acceptance directly |
-| 2 Reproduce M8 | in progress | | |
-| 3 Contracts | pending | | |
+| 1 Record the start | done | 1782c85 | owner approved starting stage 2 and running the doctor and live acceptance directly |
+| 2 Reproduce M8 | done | this commit | m8 and runtime variants passed; /run needs the resolver bound at the symlink target | |
+| 3 Contracts | in progress | | |
 | 4 Rootless runtime | pending | | |
 | 5 CLI and provisioning | pending | | |
 | 6 Doctor mode | pending | | |
