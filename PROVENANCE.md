@@ -7,11 +7,11 @@ Verbatim import commit in this repository: 5ddf473.
 | --- | --- | --- | --- |
 | worker_sandbox/runtime.py | benchkit/runtime.py | 1-661 | see "runtime.py" below |
 | worker_sandbox/worker_files.py | benchkit/worker_files.py | 1-612 | see "worker_files.py" below |
-| worker_sandbox/worker_job.py | benchkit/worker_job.py | 1-60 | none yet |
+| worker_sandbox/worker_job.py | benchkit/worker_job.py | 1-60 | none: byte-identical to 8bb76be |
 | worker_sandbox/worker_service.py | benchkit/worker_service.py | 1-29 | see "worker_service.py" below |
 | worker_sandbox/artifacts.py | benchkit/artifacts.py | 1-8, 10-125, 153-162, 172-180 | see "artifacts.py" below |
-| worker_sandbox/ownership.py | benchkit/ownership.py | 1-23 | none yet |
-| worker_sandbox/seed.py | benchkit/seed.py | 1-26 | none yet |
+| worker_sandbox/ownership.py | benchkit/ownership.py | 1-23 | none: byte-identical to 8bb76be |
+| worker_sandbox/seed.py | benchkit/seed.py | 1-26 | none: byte-identical to 8bb76be |
 | worker_sandbox/contracts.py | benchkit/contracts.py | 1-4, 6-11, 13-15, 17-18, 31, 35-48, 60-63, 68-91, 256-266, 505-576, 580-592 | see "contracts.py" below |
 | tools/setup_host.py | tools/setup_host.py | 1-59 | see "setup_host.py" below |
 | tools/doctor.py | tools/verify_host.py | 1-263 | see "doctor.py" below |
@@ -28,9 +28,15 @@ Verbatim import commit in this repository: 5ddf473.
 | tests/test_cli.py | new (preflight idea from tests/test_native_preparation.py L79) | | |
 | worker_sandbox/__main__.py | new (modeled on benchkit/__main__.py: argparse, dispatch, exit codes 0/1/2/130) | | |
 | Makefile | Makefile | 1-9 | none |
-| requirements-dev.txt | requirements-dev.txt | 2 | step 8: dropped jsonschema==4.26.0 (no schema check is carried; section 5) |
+| requirements-dev.txt | requirements-dev.txt | 1-2 | step 8: dropped jsonschema==4.26.0 (no schema check is carried; section 5) |
 | .gitignore | .gitignore | 1-13 | added /verification/, /runs/, /sandbox-runs/ |
 | pyproject.toml | pyproject.toml | 1-20 | adapted: name, description, script, package; package data dropped |
+| AGENTS.md | new (brief section 12.3, verbatim) | | |
+| README.md | new (brief section 13 verbatim under "Limitations", plus the owner-decided limits) | | |
+| PROGRESS.md | new (brief section 12.5 format) | | |
+| HANDOFF_QUESTIONS.md | new (brief section 12.4 format) | | |
+| PROVENANCE.md | new (brief Appendix C) | | |
+| LICENSE.TODO | new (placeholder; the owner chooses the license) | | |
 
 ## contracts.py
 - step 3: kept only the section 6.1 subset, copied from the listed source lines in source order
@@ -160,3 +166,32 @@ Verbatim import commit in this repository: 5ddf473.
 - step 10: added checks agent-binary-root-owned (verify_model(profile.binary, None); skipped without --binary) and managed-settings-present (informational) after the existing checks
 - step 10: literals: temporary prefix benchkit-host-check- -> worker-sandbox-host-check-; private-grader-canary -> private-controller-canary; benchkit-write-probe -> worker-sandbox-write-probe; module docstring no longer names Codex-only endpoints or Jev
 - step 10: main gains --profile and --binary
+
+## Final audit (step 13)
+
+Command: `git diff 5ddf473 -- worker_sandbox/runtime.py worker_sandbox/worker_files.py worker_sandbox/worker_service.py worker_sandbox/artifacts.py worker_sandbox/ownership.py worker_sandbox/seed.py worker_sandbox/worker_job.py`
+
+- worker_job.py, ownership.py, seed.py: no hunk; `cmp` against 8bb76be shows byte identity.
+- runtime.py (472 lines, 17 hunks), by source line of each hunk:
+  - L13 imports: payment_gateway, adapters, NativeSpec, credentials, payment_fixture, secrets, threading, uuid, reference_file, safe_open removed; profiles added (steps 4, 5, 7)
+  - L66 native_home deleted (step 7)
+  - L82 native_login deleted (step 5); __init__ signature (steps 6, 7)
+  - L120 __init__ body: payment attributes deleted (step 4); profile -> agent, home_dir, spec_path_prefix (steps 6, 7)
+  - L195 scan_tree deleted (step 5); inspect message (step 6)
+  - L227 disk_hard_quota deleted; verify_model signature (step 6)
+  - L240 verify_model digest comparison only when given (step 6)
+  - L249 claim message (step 6)
+  - L270 reset deleted (step 5); seed_native_state body (step 7); five credential methods deleted (step 5)
+  - L355 start_run docstring (step 4)
+  - L368 start_run payment setup deleted (step 4)
+  - L379 payment_gateway upload deleted (step 4); homes/swe -> home (step 6)
+  - L408 payment handlers deleted (step 4); evidence methods, scan_tree call and observe_workspace deleted (step 5)
+  - L532 _job: homes/swe -> home (step 6); environment and passthrough (step 7); PAYMENT_PROVIDER_URL deleted (step 4)
+  - L555 _observe handle_payments call deleted (step 4)
+  - L628 release credential read-back deleted (step 5)
+  - L640 release vault forget and _release_credentials deleted (step 5)
+- worker_files.py (557 lines, 4 hunks): RUN_DIRECTORIES (step 6); reset action (step 5); service_directories and payment_requests (step 4); file_identity, observe_workspace, session_evidence, native_evidence (step 5) and list (step 5).
+- worker_service.py (26 lines, 1 hunk): gateway lines (step 4).
+- artifacts.py (143 lines, 4 hunks): shutil import and contracts import (step 5); _snapshot, copy_artifact, snapshot (step 5).
+- contracts.py (159 lines): the section 6.1 subset (step 3) and the RuntimeSpec edits (step 6).
+Every hunk maps to a section 6 entry listed above in this file.
