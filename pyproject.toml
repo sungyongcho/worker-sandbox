@@ -8,6 +8,8 @@ version = "0.0.0.dev0"
 description = "Account-isolated sandbox that runs one coding-agent CLI invocation"
 requires-python = ">=3.12"
 dependencies = ["msgspec==0.21.1"]
+license = "MIT"
+license-files = ["LICENSE"]
 
 [project.scripts]
 worker-sandbox = "worker_sandbox.__main__:main"

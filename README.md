@@ -205,4 +205,4 @@ argv as is.
 - `tools/`: host provisioning, the doctor and the package verifier.
 - `PROVENANCE.md`: source and edits of every carried file. `HANDOFF_QUESTIONS.md`: every
   deviation from the extraction brief and the owner's decisions.
-- License: not chosen yet (`LICENSE.TODO`).
+- License: MIT (`LICENSE`).

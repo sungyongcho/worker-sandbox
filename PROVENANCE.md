@@ -36,7 +36,7 @@ Verbatim import commit in this repository: 5ddf473.
 | PROGRESS.md | new (brief section 12.5 format) | | |
 | HANDOFF_QUESTIONS.md | new (brief section 12.4 format) | | |
 | PROVENANCE.md | new (brief Appendix C) | | |
-| LICENSE.TODO | new (placeholder; the owner chooses the license) | | |
+| LICENSE | new (MIT, chosen by the owner 2026-10-02; replaced LICENSE.TODO) | | |
 
 ## contracts.py
 - step 3: kept only the section 6.1 subset, copied from the listed source lines in source order
