@@ -40,3 +40,30 @@ Import commit: 5ddf473
    current step only; finish or revert that step, nothing else.
 5. If "Offline suite" says not run since the last commit, run it.
 6. Continue at "Next action".
+
+## Stage 2
+
+Brief: <worker-benchmark>/SANDBOX_STAGE2_HANDOFF.md
+Base commit: bd84174
+
+### State
+- Current step: 2 Reproduce M8
+- Status: in progress
+- Last commit: this commit docs(progress): start stage 2 rootless mode
+- Working tree: clean
+- Offline suite: 101 passed at 66b9329 (stage 1)
+- Next action: commit this section, then port Appendix A into tools/probe_rootless.py and run it to reproduce M8 before any package code
+- Blocked on: none
+
+### Step log
+| Step | Status | Commit | Note |
+| --- | --- | --- | --- |
+| 1 Record the start | done | this commit | owner approved starting stage 2 and running the doctor and live acceptance directly |
+| 2 Reproduce M8 | in progress | | |
+| 3 Contracts | pending | | |
+| 4 Rootless runtime | pending | | |
+| 5 CLI and provisioning | pending | | |
+| 6 Doctor mode | pending | | |
+| 7 Live acceptance | pending | | |
+| 8 README | pending | | |
+| 9 Provenance and progress | pending | | |
