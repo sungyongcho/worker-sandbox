@@ -59,11 +59,11 @@ Base commit: bd84174
 | Step | Status | Commit | Note |
 | --- | --- | --- | --- |
 | 1 Record the start | done | 1782c85 | owner approved starting stage 2 and running the doctor and live acceptance directly |
-| 2 Reproduce M8 | done | 8603228 | m8 and runtime variants passed; /run needs the resolver bound at the symlink target
-| 3 Contracts | done | 7ae6eeb | stage 1 host.json byte test now compares the decoded spec
-| 4 Rootless runtime | done | bdcf8bc | worker root moved out of HOME; bridge without --mount-proc; setup-job launcher
-| 5 CLI and provisioning | done | dc40420 | host provisioned rootless; rootless host.json preferred when present
-| 6 Doctor mode | done | 2ababe6, 31bffdf (fix) | attempt 2 passed: verification/doctor-rootless-20261002T093518Z.json; attempt 1 failed on the worker root parent mode
+| 2 Reproduce M8 | done | 8603228 | m8 and runtime variants passed; /run needs the resolver bound at the symlink target |
+| 3 Contracts | done | 7ae6eeb | stage 1 host.json byte test now compares the decoded spec |
+| 4 Rootless runtime | done | bdcf8bc | worker root moved out of HOME; bridge without --mount-proc; setup-job launcher |
+| 5 CLI and provisioning | done | dc40420 | host provisioned rootless; rootless host.json preferred when present |
+| 6 Doctor mode | done | 2ababe6, 31bffdf (fix) | attempt 2 passed: verification/doctor-rootless-20261002T093518Z.json; attempt 1 failed on the worker root parent mode |
 | 7 Live acceptance | done | 1473ad0, ad6c33a, ee1af75, fdf3871 | codex runs/4d0a5d8c9e3b486890cc6cefc7b1a1b3 and claude runs/8c0a52ba3c514b6aba074ffb72937934 passed; codex needed its own sandbox off (owner decision); --strict-mcp-config added after 7.4 |
-| 8 README | done | 1db20c0 | three stage 1 limitation lines updated
-| 9 Provenance and progress | done | 4a9173c | 7.5 diff empty
+| 8 README | done | 1db20c0 | three stage 1 limitation lines updated |
+| 9 Provenance and progress | done | 4a9173c | 7.5 diff empty |
