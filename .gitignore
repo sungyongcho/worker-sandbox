@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.env.*
+runs/
+local/
+credentials.toml
+auth.json
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+/verification/
+/runs/
+/sandbox-runs/
