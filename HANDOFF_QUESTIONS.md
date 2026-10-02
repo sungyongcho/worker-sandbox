@@ -97,3 +97,43 @@ features (`@benchkit-` socket label in 386, BENCHKIT_* and JEV_API_KEY environme
 Expected: "Keep the offline guard that blocks network, `sudo`, `systemctl`, `systemd-run` and the agent binaries" (section 6.12).
 Observed: the carried guard blocks only `codex`; the stripped environment lists JEV_API_KEY.
 Did instead: added `claude` to the blocked executables and replaced JEV_API_KEY with the Claude credential variables.
+
+## 2026-10-02 tools/setup_host.py:53
+Expected: "After `prepare`, write `host.json` through `hostconfig.write`" (6.10), and the owner provisions with
+`sudo /usr/bin/python3 -I tools/setup_host.py --controller ...` (11.2).
+Observed: hostconfig imports contracts, which needs msgspec; root's /usr/bin/python3 has no msgspec, and -I keeps the
+checkout off sys.path. Both instructions cannot hold together.
+Did instead: setup_host.py stays standard-library only and writes host.json itself (host_document, write_host) in the
+exact bytes contracts.dumps produces. tests/test_cli.py HostConfigTests pins setup_host.host_document to
+contracts.dumps and reads the file back with hostconfig.read; hostconfig.write remains and writes the same bytes.
+
+## 2026-10-02 worker_sandbox/__main__.py:28
+Expected: `worker-sandbox setup-host` runs `tools/setup_host.prepare`; `worker-sandbox doctor` runs `tools/doctor.verify` (6.9).
+Observed: pyproject packages only worker_sandbox (section 5: no package data), so an installed wheel has no tools/.
+Did instead: both commands load tools/<name>.py from the source checkout beside the package and refuse with a clear
+message when it is absent. They work from the checkout (`python -m worker_sandbox ...` run in the repository root,
+or an editable install); the direct `tools/setup_host.py` and `tools/doctor.py` commands of section 11 are unaffected.
+Owner to decide whether tools should move into the package later.
+
+## 2026-10-02 worker_sandbox/__main__.py:39
+Expected: `worker-sandbox login --profile codex|claude` (6.9, 11.4) builds `profiles.<P>(binary)`.
+Observed: login has no binary source, and run's --binary is optional.
+Did instead: login and run take an optional --binary; without it the agent is looked up by name on the worker PATH
+/usr/local/bin:/usr/bin:/bin. The section 11.4 login commands therefore need --binary for the Claude copy under
+/usr/local/lib/worker-sandbox-claude/... Login verifies the binary with verify_model(binary, None) first, as native_login did.
+
+## 2026-10-02 worker_sandbox/__main__.py:121
+Expected: `argv=profile.command(...)+extra` (6.9 step 7) and `command(..., extra)` returns argv "+ extra" (6.8).
+Observed: following both appends EXTRA ARGV twice.
+Did instead: extra is passed once, through command(extra=...). tests/test_cli.py test_extra_argv_is_appended_once.
+
+## 2026-10-02 worker_sandbox/__main__.py:1
+Expected: `__main__.py` "≤ 250 lines" (4.2 size guide).
+Observed: 257 lines.
+Did instead: nothing; the overrun is the doctor and setup-host loaders described above.
+
+## 2026-10-02 worker_sandbox/__main__.py:104
+Expected: a failed preflight stops "with outcome `provider_error`" (6.9 step 5); result.json has run_id, profile,
+session_id, result, stdout, stderr (6.9 step 9, section 9).
+Did instead: result.json carries the preflight RuntimeResult with outcome set to provider_error (error text kept, or
+"login status exited with N"), session_id null, and stdout/stderr pointing at the status job's logs. No extra key was added.

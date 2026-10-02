@@ -584,6 +584,65 @@ raise SystemExit(7)
             'XDG_STATE_HOME': home + '/.local/state', 'DISABLE_TELEMETRY': '1', 'DISABLE_ERROR_REPORTING': '1',
             'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC': '1', 'TMPDIR': self.runtime.worker_path('tmp')})
 
+    def test_login_imports_a_validated_credential_from_a_private_staging_home(self):
+        from worker_sandbox import __main__ as cli
+        profile = codex('/usr/bin/native')
+        staging = self.runtime.control / 'credentials/codex'
+        calls = []
+
+        def agent_login(argv, *, cwd, env, check, stdout=None):
+            calls.append(argv)
+            self.assertEqual(Path(cwd), staging)
+            self.assertEqual(Path(cwd).stat().st_mode & 0o777, 0o700)
+            self.assertEqual((env['HOME'], env['CODEX_HOME']), (str(staging), str(staging) + '/.codex'))
+            if argv == profile.login_argv:
+                Path(env['CODEX_HOME']).mkdir(mode=0o700)
+                (Path(env['CODEX_HOME']) / 'auth.json').write_bytes(codex_auth())
+                return SimpleNamespace(returncode=0)
+            return SimpleNamespace(returncode=0, stdout=b'Logged in using ChatGPT\n')
+
+        with patch('worker_sandbox.__main__.hostconfig.read', return_value=c.RuntimeSpec(control_root=str(self.runtime.control))), \
+             patch('worker_sandbox.__main__.subprocess.run', side_effect=agent_login), \
+             patch.object(NativeRuntime, 'verify_model') as verify:
+            result = cli.login(profile)
+        self.assertEqual(result, {'profile': 'codex', 'status_exit_code': 0, 'status': 'Logged in using ChatGPT\n'})
+        self.assertEqual(calls, [profile.login_argv, profile.status_argv])
+        verify.assert_called_once_with('/usr/bin/native', None)
+        for path in (staging.parent, staging):
+            self.assertEqual(path.stat().st_mode & 0o777, 0o700)
+        self.assertEqual((staging / profile.credential_files[0]).read_bytes(), codex_auth())
+        self.assertEqual({path.name for path in self.runtime.control.iterdir()}, {'credentials', 'owner.lock'})
+        self.runtime.agent = profile
+        self.claim()
+        self.assertEqual(self.home_files(), list(profile.credential_files))
+
+    def test_login_failures_leave_the_vault_unchanged(self):
+        from worker_sandbox import __main__ as cli
+        profile = codex('/usr/bin/native')
+        staging = self.runtime.control / 'credentials/codex'
+        for path in (staging.parent, staging, staging / '.codex'):
+            path.mkdir(mode=0o700)
+        (staging / '.codex/auth.json').write_bytes(codex_auth())
+        spec = c.RuntimeSpec(control_root=str(self.runtime.control))
+
+        def staged():
+            return sorted((path.relative_to(staging).as_posix(), path.read_bytes()) for path in staging.rglob('*') if path.is_file())
+
+        before = staged()
+        with patch('worker_sandbox.__main__.hostconfig.read', return_value=spec), \
+             patch('worker_sandbox.__main__.subprocess.run', return_value=SimpleNamespace(returncode=1)) as run, \
+             patch.object(NativeRuntime, 'verify_model'), self.assertRaisesRegex(c.ContractError, 'codex login failed'):
+            cli.login(profile)
+        self.assertEqual([call.args[0] for call in run.call_args_list], [profile.login_argv])
+        self.assertEqual(staged(), before)
+        self.claim()
+        with patch('worker_sandbox.__main__.hostconfig.read', return_value=spec), \
+             patch('worker_sandbox.__main__.subprocess.run') as run, \
+             self.assertRaisesRegex(c.ContractError, 'outside any run'):
+            cli.login(profile)
+        run.assert_not_called()
+        self.assertEqual(staged(), before)
+
     def test_invalid_binary_stops_login_before_any_subprocess(self):
         binary = (self.run / 'native-fixture').resolve()
         binary.write_bytes(b'fixture executable\n')

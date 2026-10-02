@@ -6,12 +6,12 @@ Repository: <worker-sandbox>
 Import commit: 5ddf473
 
 ## State
-- Current step: 9 CLI
+- Current step: 10 Doctor
 - Status: in progress
-- Last commit: this commit test: port the sandbox tests
+- Last commit: this commit feat: add the worker-sandbox command line
 - Working tree: clean
-- Offline suite: 80 passed at this commit (pip install the repo into .venv first; -I imports the installed package); verify_package passed: verification/package-20261002T070216Z.json
-- Next action: write worker_sandbox/__main__.py (section 6.9), parameterize tools/setup_host.py (6.10), add tests/test_cli.py, re-add tests 877 and 902 adapted to login, run the suite and verify_package
+- Offline suite: 99 passed at this commit; verify_package passed: verification/package-20261002T070822Z.json
+- Next action: wait for the owner to provision the host (section 11.2) and run sudo -v; then apply section 6.11 to tools/doctor.py (verify(report_path, timeout, profile, *, check_binary)) and run it live with the owner present
 - Blocked on: none
 
 ## Step log
@@ -24,8 +24,8 @@ Import commit: 5ddf473
 | 5 Remove evidence and vault features | done | b9aa4bc | |
 | 6 Parameterize | done | 17f7f42 | |
 | 7 Profiles and host config | done | 934adfa | |
-| 8 Tests | done | this commit | 6.12 verify_package edits included | |
-| 9 CLI | in progress | | |
+| 8 Tests | done | c92e17f | 6.12 verify_package edits included | |
+| 9 CLI | done | this commit | setup_host 6.10 and tests 877, 902 included | |
 | 10 Doctor | pending | | owner present for sudo -v |
 | 11 Live acceptance | pending | | owner present |
 | 12 README | pending | | |

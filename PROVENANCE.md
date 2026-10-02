@@ -13,7 +13,7 @@ Verbatim import commit in this repository: 5ddf473.
 | worker_sandbox/ownership.py | benchkit/ownership.py | 1-23 | none yet |
 | worker_sandbox/seed.py | benchkit/seed.py | 1-26 | none yet |
 | worker_sandbox/contracts.py | benchkit/contracts.py | 1-4, 6-11, 13-15, 17-18, 31, 35-48, 60-63, 68-91, 256-266, 505-576, 580-592 | see "contracts.py" below |
-| tools/setup_host.py | tools/setup_host.py | 1-59 | none yet |
+| tools/setup_host.py | tools/setup_host.py | 1-59 | see "setup_host.py" below |
 | tools/doctor.py | tools/verify_host.py | 1-263 | none yet |
 | tools/verify_package.py | tools/verify_package.py | 1-136 | see "verify_package.py" below |
 | tests/test_runtime.py | tests/test_runtime.py | 1-1192 | see "test_runtime.py" below |
@@ -24,6 +24,8 @@ Verbatim import commit in this repository: 5ddf473.
 | worker_sandbox/profiles.py | new (Codex facts from benchkit/adapters.py L12, L96-99, L177-184, L265-267 and runtime.py L69-73) | | |
 | worker_sandbox/hostconfig.py | new | | |
 | tests/test_profiles.py | new | | |
+| tests/test_cli.py | new (preflight idea from tests/test_native_preparation.py L79) | | |
+| worker_sandbox/__main__.py | new (modeled on benchkit/__main__.py: argparse, dispatch, exit codes 0/1/2/130) | | |
 | Makefile | Makefile | 1-9 | none |
 | requirements-dev.txt | requirements-dev.txt | 2 | step 8: dropped jsonschema==4.26.0 (no schema check is carried; section 5) |
 | .gitignore | .gitignore | 1-13 | added /verification/, /runs/, /sandbox-runs/ |
@@ -114,6 +116,8 @@ Verbatim import commit in this repository: 5ddf473.
 - step 8: 994 bulk_bridge_count_does_not_grow_with_file_count: deleted the native-evidence block (L1003-1009)
 - step 8: 1069, 1075: unit User food-delivery -> worker-sandbox
 - step 8: 1150: deleted the handle_payments patch line (L1160)
+- step 9: 877 login_imports_a_validated_credential_from_a_private_staging_home re-added, adapted to worker_sandbox.__main__.login: a fake login argv writes .codex/auth.json into credentials/codex; staging and its parent are 0700; status argv runs second; a claim then seeds exactly the credential file
+- step 9: 902 login_failures_leave_the_vault_unchanged re-added, adapted: a failing login argv leaves the staged files unchanged; login under a lease runs no subprocess
 
 ## test_bulk_transfer.py
 - step 8: L15 benchkit -> worker_sandbox. Test 64 never calls native_evidence, so no assertion was removed
@@ -133,3 +137,9 @@ Verbatim import commit in this repository: 5ddf473.
 - step 8: stripped environment: JEV_API_KEY -> ANTHROPIC_API_KEY and CLAUDE_CODE_OAUTH_TOKEN
 - step 8: temporary directory prefix benchkit-verification- -> worker-sandbox-verification-
 - step 8: no schema export check exists in the carried file; nothing dropped
+
+## setup_host.py
+- step 9: L16-18 constants: new defaults worker-sandbox, /var/lib/worker-sandbox-worker, /var/lib/worker-sandbox-controller; added PYTHON = '/usr/bin/python3'
+- step 9: prepare(controller) -> prepare(controller, account=ACCOUNT, worker=WORKER, control=CONTROL); every use of the constants inside prepare uses the parameters; the local `worker` (the account entry) renamed `worker_account` because `worker` is now the root parameter
+- step 9: added `import json`, host_document and write_host: host.json in the canonical bytes of contracts.dumps(RuntimeSpec), O_EXCL 0600, owned by the controller (see HANDOFF_QUESTIONS)
+- step 9: main gains --account, --worker-root, --control-root and --python, then calls write_host after prepare. The useradd argv and every refusal are unchanged
