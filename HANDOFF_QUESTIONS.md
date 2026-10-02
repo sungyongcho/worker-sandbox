@@ -229,8 +229,8 @@ Expected: worker_root default `$XDG_STATE_HOME/worker-sandbox/worker`, owned by 
 Observed: /home/<user> is 0750 and ~/.local, ~/.local/state are 0700, so host uid 100000 (inner 1000) cannot traverse to
 anything under HOME; neither the bridge nor bwrap's bind source could reach that worker root. For the same reason the
 4.4 read-only bind of an agent binary under /home cannot work on this host (root-owned copies are unaffected).
-Did instead: default worker_root `/var/tmp/worker-sandbox-<user>/worker`; its parent is controller-owned 0711 (traversable,
-not listable) and the worker root itself is sub-UID-owned 0700. The control root stays at
+Did instead: default worker_root `/var/tmp/worker-sandbox-<user>/worker`; its parent is controller-owned 0755 and the worker
+root itself is sub-UID-owned 0700. (First provisioned 0711; doctor attempt 1 showed the bridge needs read on the parent, see below.) The control root stays at
 `$XDG_STATE_HOME/worker-sandbox/controller`. verify_model refuses a binary whose directories other users cannot traverse,
 so a binary under a private HOME fails early with a clear message. Owner to confirm the location.
 
@@ -280,3 +280,11 @@ running setup-rootless. Owner to confirm, or choose an explicit option instead.
 Provisioned on this host (no root): `worker-sandbox setup-rootless` created ~/.local/state/worker-sandbox/controller (0700,
 controller) with host.json (mode rootless, sub-UID/GID 100000), /var/tmp/worker-sandbox-<user> (0711) and its worker root
 (0700, 100000:100000).
+
+## 2026-10-02 tools/doctor.py rootless doctor (stage 2 step 6)
+Attempt 1 (verification/doctor-rootless-20261002T093434Z.json) failed in claim: the bridge's directory_fd opens every
+ancestor with O_RDONLY|O_DIRECTORY, which needs read permission, and the worker root's parent was 0711. It left a lease
+and the worker run directory; `worker-sandbox recover <run>` (rootless) released both. Fix: the parent is 0755
+(provision() and this host). Attempt 2 (verification/doctor-rootless-20261002T093518Z.json) passed: mode rootless,
+19 checks with the stage 1 names and order except agent-binary-read-only-in-sandbox (write open refused with EACCES,
+`--version` printed 2.1.286), worker root empty through the bridge, no sub-UID process, no slirp4netns, no unit record.

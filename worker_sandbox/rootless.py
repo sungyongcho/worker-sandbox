@@ -91,7 +91,9 @@ def provision(spec: RuntimeSpec) -> dict:
         raise ContractError('rootless roots already exist; inspect them before provisioning')
     control.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     control.mkdir(mode=0o700)
-    worker.parent.mkdir(mode=0o711)
+    # The bridge opens every ancestor O_RDONLY|O_DIRECTORY, so the sub-UID needs read, not only search, on the parent.
+    worker.parent.mkdir(mode=0o755)
+    worker.parent.chmod(0o755)
     # Inner root creates the worker root and hands it to inner 1000, so its host owner is the sub-UID.
     creator = 'import os,sys; os.mkdir(sys.argv[1], 0o700); os.chown(sys.argv[1], 1000, 1000)'
     checked_command(['/usr/bin/unshare', '--user', *mapping(spec), '--', spec.python, '-I', '-c', creator, str(worker)])
