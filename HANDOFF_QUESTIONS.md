@@ -358,3 +358,12 @@ Claude (7.3 command; the profile now passes --strict-mcp-config): runs/8c0a52ba3
 completed, exit_code 0, session 9d010230-aa41-4093-9e39-3a9a6f8507c0, hello.txt = "hello\n", mcp_servers [], no connector
 mentioned. After each run: worker root empty through the bridge, no sub-UID (100000) process, no slirp4netns, no unshare,
 no unit record, no lease. No sudo was used anywhere in stage 2.
+
+## 2026-10-02 README.md (stage 2 step 8)
+Expected: a "Rootless mode" section with the requirements, setup-rootless, the ownership model and the section 9 limits.
+Did: added it, with the section 9 bullets as written except "listed in 5.3" -> "listed above", plus the owner-decided
+limits (worker root under /var/tmp and its repair, rootless host.json preferred and WORKER_SANDBOX_MODE=root, Codex
+without its own sandbox in rootless mode, binary reachability). Three stage 1 Limitations lines that are no longer true
+were edited: "There is no rootless mode yet ..." now says root mode needs root and the rootless mode does not; the
+control-root line names both default control roots; the connector line says the Claude profile passes
+--strict-mcp-config. The section is now titled "Limitations (root mode)". The Profiles paragraph shows the new flag.

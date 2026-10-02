@@ -156,19 +156,18 @@ process remains, and releases the account.
 
 Codex runs as `codex exec --json` with the `worker_sandbox` permission profile (workspace
 write, network on, approvals never). Claude Code runs as
-`claude -p --output-format stream-json --verbose --dangerously-skip-permissions --permission-prompts none`
-with telemetry, error reporting and nonessential traffic disabled. `generic` runs the given
-argv as is.
+`claude -p --output-format stream-json --verbose --dangerously-skip-permissions --permission-prompts none --strict-mcp-config`
+with telemetry, error reporting and nonessential traffic disabled. `--strict-mcp-config` keeps a
+claude.ai account's remote MCP connectors out of the run. `generic` runs the given argv as is.
 
-## Limitations
+## Limitations (root mode)
 
 - Linux only. Requires systemd 250 or later (this host: 259), `sudo` for the
   controller user, root once for `setup-host`, `/usr/bin/slirp4netns`, Python 3.12
   or later for the controller environment and `/usr/bin/python3` for the worker
   bridge.
-- Stage 1 runs `systemd-run` as root and drops to the worker account. There is
-  no rootless mode yet; a rootless distribution is the planned final form and is
-  not designed in this stage.
+- Root mode runs `systemd-run` as root and drops to the worker account. The
+  rootless mode below needs no root at runtime.
 - One run at a time per worker account. A second `run` refuses while the lease
   exists.
 - No CPU, memory, disk or time limits are imposed on the agent. The host's
@@ -194,15 +193,116 @@ argv as is.
   later-stage item.
 - `setup-host` and `doctor` work only from the source checkout: `tools/` is not part of the
   installed package. Use `tools/setup_host.py` and `tools/doctor.py` directly, as shown above.
-- Only the default control root `/var/lib/worker-sandbox-controller` is supported; the
-  commands read `host.json` from there.
+- Only the default control roots are supported: `/var/lib/worker-sandbox-controller` in root
+  mode and `$XDG_STATE_HOME/worker-sandbox/controller` in rootless mode.
 - Login files are copied as written by the agent's own login. A Claude Code login on a
-  claude.ai account also brings that account's remote MCP connectors into the run.
+  claude.ai account carries that account's remote MCP connectors; the Claude profile passes
+  `--strict-mcp-config` so they do not load in the run.
+
+## Rootless mode
+
+Rootless mode runs the same commands, profiles, job protocol and doctor checks without root and
+without `sudo` at runtime. The agent runs as inner uid 1000 of a user namespace, which on the
+host is the first subordinate uid of your user (for example 100000), not a separate account.
+
+Layers, outermost first:
+
+1. `unshare --user --net --mount --mount-proc --pid --fork --kill-child` with a two-entry id
+   map: your uid becomes inner 0, your first sub-UID becomes inner 1000 (same for groups).
+2. As inner 0, a small init waits for the network, installs an nftables output chain that
+   accepts slirp's resolver `10.0.2.3` and drops the slirp gateway `10.0.2.2`, every host
+   address (IPv4 and IPv6), loopback, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`,
+   `fe80::/10` and `fc00::/7`, then drops to inner 1000 with `setpriv` (no capabilities, no
+   new privileges, no groups).
+3. A nested `bubblewrap` mount sandbox: `/` read-only, `/home`, `/var`, `/run`, `/tmp` and
+   `/dev/shm` replaced (`/var` and `/run` read-only), private `/proc` and `/dev`, the run's
+   worker directory bound read-write, and a resolver pointing at `10.0.2.3`.
+4. `slirp4netns`, started by the controller, gives the namespace internet access with the
+   host loopback disabled.
+
+Files move across the boundary through the same bridge as root mode, run as inner 1000 through
+`unshare` and `setpriv` instead of `sudo -u`.
+
+### Requirements
+
+- A subordinate id range for your user in `/etc/subuid` and `/etc/subgid` (Ubuntu adds one for
+  the first user), and the setuid helpers `newuidmap` and `newgidmap`.
+- `unshare` and `setpriv` (util-linux), `bwrap`, `slirp4netns`, `nft` and `ip`.
+- On Ubuntu 24.04 and later, where `kernel.apparmor_restrict_unprivileged_userns = 1`, the
+  AppArmor profile `/etc/apparmor.d/bwrap-userns-restrict` (shipped with the bubblewrap
+  package) so `bwrap` may create user namespaces.
+- Root is needed only to add those, once. Nothing runs as root afterwards.
+
+### Set up and check
+
+```bash
+.venv/bin/worker-sandbox setup-rootless
+.venv/bin/python -B tools/doctor.py --report verification/doctor-rootless-$(date -u +%Y%m%dT%H%M%SZ).json --profile claude --binary /usr/local/lib/worker-sandbox-claude/2.1.286/claude
+```
+
+`setup-rootless` reads your sub-UID and sub-GID bases, checks the host binaries and the
+AppArmor profile, and creates:
+
+- `$XDG_STATE_HOME/worker-sandbox/controller` (default `~/.local/state/...`, 0700, yours): the
+  lease, `host.json` with `mode: rootless`, and `credentials/`, as in root mode;
+- `/var/tmp/worker-sandbox-<user>` (0755, yours) and in it the worker root `worker` (0700,
+  owned by your first sub-UID). You cannot list the worker root directly; the bridge can.
+
+It refuses when the rootless `host.json` already exists, except when only the worker root is
+gone: then it recreates the worker root as recorded.
+
+Log in again with `worker-sandbox login`, or copy existing staged logins into the rootless
+control root, for example
+`cp -a /var/lib/worker-sandbox-controller/credentials ~/.local/state/worker-sandbox/controller/credentials`.
+
+When your rootless `host.json` exists, `login`, `run`, `recover` and the doctor use it; set
+`WORKER_SANDBOX_MODE=root` to use root mode instead.
+
+### Rootless limitations
+
+- Root once at install on hosts that lack them: a sub-UID/sub-GID range for the
+  user in `/etc/subuid` and `/etc/subgid` (Ubuntu adds one for the first user),
+  and an AppArmor profile that lets `bwrap` create user namespaces on Ubuntu
+  24.04 and later (`bwrap-userns-restrict` ships with the package here). No
+  root at runtime.
+- The agent runs as a sub-UID of the controller's user, not as a separately
+  administered account. Files it writes are owned by that sub-UID on the host;
+  the controller reaches them only through the bridge.
+- Stop is enforced by the pid namespace (killing its init kills all), not by a
+  cgroup. There is no `ExitType=cgroup` equivalent.
+- Host and LAN denial is an nftables output chain in the sandbox's network
+  namespace, installed before privileges drop; it covers the host's addresses,
+  loopback, the slirp gateway and the private ranges listed above. There is no
+  `IPAddressDeny`.
+- Inside the sandbox `/sys` reflects the host; interface names are visible,
+  interfaces are not reachable.
+- Everything else from the root-mode list still applies: no resource limits,
+  one run at a time, workspace copied in and out, no resume across runs, no
+  evidence sealing.
+- The private-range drops (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fe80::/10`,
+  `fc00::/7`) go beyond root mode, which denies only the host's own addresses; they are the
+  owner's selection for rootless mode. slirp4netns provides no IPv6 route.
+- The worker root lives under `/var/tmp` because the sub-UID cannot traverse a private home
+  directory. `systemd-tmpfiles` may remove it after long disuse; `inspect` then says so and
+  `setup-rootless` recreates it. A worker root not owned by your sub-UID with mode 0700 is
+  refused.
+- For the same reason an agent binary must be reachable by other users: readable and
+  executable, in directories others can traverse, and not world-writable. A binary under a
+  private HOME is refused; install it under `/usr/local` or similar.
+- Codex runs without its own tool sandbox in rootless mode (`-c sandbox_mode="danger-full-access"`).
+  The AppArmor child profile `unpriv_bwrap`, which confines everything inside a bubblewrap
+  sandbox on such hosts, stops a nested bubblewrap from starting, and Codex's tool sandbox is
+  one. worker-sandbox is then the only boundary, the same stance as Claude Code's skipped
+  permission prompts. Root mode is unchanged.
+- The rootless host config is chosen whenever it exists; `WORKER_SANDBOX_MODE=root` forces
+  root mode. There is no `--mode` option yet.
 
 ## Repository
 
-- `worker_sandbox/`: the package (carried modules plus `profiles.py`, `hostconfig.py` and the CLI).
-- `tools/`: host provisioning, the doctor and the package verifier.
+- `worker_sandbox/`: the package (carried modules plus `profiles.py`, `hostconfig.py`, the CLI,
+  and `rootless.py` with `rootless_init.py` for rootless mode).
+- `tools/`: host provisioning, the doctor, the package verifier and `probe_rootless.py`, the
+  reference measurement of the rootless chain.
 - `PROVENANCE.md`: source and edits of every carried file. `HANDOFF_QUESTIONS.md`: every
   deviation from the extraction brief and the owner's decisions.
 - License: MIT (`LICENSE`).
