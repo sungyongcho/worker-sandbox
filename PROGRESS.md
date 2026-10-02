@@ -8,10 +8,10 @@ Import commit: 5ddf473
 ## State
 - Current step: 11 Live acceptance
 - Status: in progress
-- Last commit: test: add the empty acceptance workspace
+- Last commit: 7f9c724 docs(progress): record the passing doctor and the start of step 11
 - Working tree: clean
 - Offline suite: 100 passed after the login fix (pip install the repo into .venv before running)
-- Next action: owner runs `worker-sandbox login --profile codex --binary <root-owned codex>` in a terminal tab; then claude login, then the two runs and the resumes of section 11.4, judging each result.json
+- Next action: owner runs the claude login (--binary /usr/local/lib/worker-sandbox-claude/2.1.286/claude) in a terminal tab; then the codex and claude runs of section 11.4
 - Blocked on: owner: interactive login and sudo -v for the runs (run through the terminal panel, never `!`)
 
 ## Step log
@@ -27,7 +27,7 @@ Import commit: 5ddf473
 | 8 Tests | done | c92e17f | 6.12 verify_package edits included | |
 | 9 CLI | done | b43a79e | setup_host 6.10 and tests 877, 902 included | |
 | 10 Doctor | done | 700f26d | passed live: verification/doctor-20261002T083240Z.json (19 checks; worker root empty; no bk-* unit); attempts 1-3 refused by sudo -n in the agent shell |
-| 11 Live acceptance | in progress | | owner present |
+| 11 Live acceptance | in progress | | codex login passed (status_exit_code 0, .codex/auth.json 0600 staged; codex prints status on stderr, so the JSON status is empty) |
 | 12 README | pending | | |
 | 13 Provenance final pass | pending | | |
 
