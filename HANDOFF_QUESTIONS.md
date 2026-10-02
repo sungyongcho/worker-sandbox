@@ -288,3 +288,27 @@ and the worker run directory; `worker-sandbox recover <run>` (rootless) released
 (provision() and this host). Attempt 2 (verification/doctor-rootless-20261002T093518Z.json) passed: mode rootless,
 19 checks with the stage 1 names and order except agent-binary-read-only-in-sandbox (write open refused with EACCES,
 `--version` printed 2.1.286), worker root empty through the bridge, no sub-UID process, no slirp4netns, no unit record.
+
+## 2026-10-02 rootless credentials (stage 2 step 7)
+Which happened (7.3): the owner copied the stage 1 staged logins with
+`cp -a /var/lib/worker-sandbox-controller/credentials ~/.local/state/worker-sandbox/controller/credentials`; no new login.
+Checked by name and mode only: codex/.codex/auth.json, claude/.claude/.credentials.json and claude/.claude/.claude.json, all 0600, directories 0700.
+
+## 2026-10-02 rootless Codex acceptance: Codex's own sandbox cannot start (stage 2 step 7, STOP)
+Run: verification/acceptance-rootless/runs/adbd5d0aaf3e4de991d0e8becd24c14c. exit 0, outcome completed, exit_code 0,
+session 01a0fbf9-1506-7e41-aaf9-5436164b1ea7, but **no hello.txt**: every Codex tool call failed. Codex wraps shell
+commands and apply_patch in its own bubblewrap sandbox, and each attempt printed "bwrap: No permissions to create a new
+namespace"; Codex then reported "I couldn't create hello.txt" and exited 0. After the run: worker root empty (bridge),
+no sub-UID process, no slirp4netns, no unshare, no unit record.
+Measured cause: every process inside a bwrap sandbox on this host runs under the AppArmor label `bwrap//&unpriv_bwrap
+(enforce)`, and a bwrap started from there cannot create namespaces (`nested rc=1`), with or without --unshare-user.
+The same happens with a plain bwrap started from the controller's own shell, so it is the host policy
+(kernel.apparmor_restrict_unprivileged_userns=1 with the shipped bwrap-userns-restrict profile), not the stage 2 layers.
+`unshare -U` does succeed inside. Root mode is unaffected because its outer layer is systemd, not bwrap.
+Did instead: nothing to the code; the Codex acceptance is not passed. Options for the owner:
+(a) in rootless mode, run Codex with its own sandbox off (for example `-c sandbox_mode="danger-full-access"` or a
+    permission profile without the Linux sandbox), so the worker-sandbox boundary is the only sandbox, as for Claude Code
+    (permissions skipped); this needs a profiles.py change the brief does not enumerate;
+(b) replace the nested bwrap with a mount sandbox built by inner root in the outer unshare (no unpriv_bwrap label), then
+    measure whether Codex's bwrap works there; this is a redesign beyond section 4;
+(c) accept that Codex is root-mode only on hosts with this AppArmor policy and document it.
