@@ -3,23 +3,23 @@
 Brief: <worker-benchmark>/SANDBOX_STAGE1_HANDOFF.md
 Start prompt: <worker-benchmark>/SANDBOX_STAGE1_START_PROMPT.md
 Repository: <worker-sandbox>
-Import commit: not yet
+Import commit: 5ddf473
 
 ## State
-- Current step: 2 Verbatim import
+- Current step: 3 Contracts subset
 - Status: in progress
-- Last commit: d6b35ec chore: scaffold the repository
+- Last commit: 5ddf473 chore: import sandbox modules verbatim from worker-benchmark-kit 8bb76be
 - Working tree: clean
-- Offline suite: not run since d6b35ec (no code yet)
-- Next action: copy every file in section 4.1 byte-for-byte with cp, compare with cmp, commit as the verbatim import, then record the import hash
+- Offline suite: not run since 5ddf473 (package does not import until step 3)
+- Next action: cut worker_sandbox/contracts.py to the section 6.1 subset, record it in PROVENANCE.md, run the suite
 - Blocked on: none
 
 ## Step log
 | Step | Status | Commit | Note |
 | --- | --- | --- | --- |
 | 1 Scaffold | done | d6b35ec | |
-| 2 Verbatim import | in progress | | import commit holds only the copies (R1); its hash is recorded in a following docs commit |
-| 3 Contracts subset | pending | | |
+| 2 Verbatim import | done | 5ddf473 | import commit holds only the copies (R1); its hash is recorded in a following docs commit |
+| 3 Contracts subset | in progress | | |
 | 4 Remove the payment fixture | pending | | |
 | 5 Remove evidence and vault features | pending | | |
 | 6 Parameterize | pending | | |

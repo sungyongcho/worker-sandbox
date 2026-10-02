@@ -1,7 +1,7 @@
 # Provenance
 
 Source: worker-benchmark-kit at commit 8bb76be (private repository).
-Verbatim import commit in this repository: not yet.
+Verbatim import commit in this repository: 5ddf473.
 
 | File | Source | Lines | Edits after import |
 | --- | --- | --- | --- |
