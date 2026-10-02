@@ -8,10 +8,10 @@ Import commit: 5ddf473
 ## State
 - Current step: 11 Live acceptance
 - Status: in progress
-- Last commit: this commit fix(profiles): stage the claude global config from its config directory as login writes it
+- Last commit: 13d7156 fix(profiles): stage the claude global config from its config directory as login writes it
 - Working tree: clean
-- Offline suite: 101 passed at this commit; verify_package passed: verification/package-20261002T083950Z.json
-- Next action: owner runs sudo -v and the codex hello.txt run of section 11.4 in a terminal tab; judge result.json, worker root and bk-* units
+- Offline suite: 101 passed at 13d7156; verify_package passed: verification/package-20261002T083950Z.json
+- Next action: owner reruns the codex hello.txt run with --model gpt-6-sol (section 11.4 fallback; argument only); judge result.json, worker root and bk-* units
 - Blocked on: owner: interactive login and sudo -v for the runs (run through the terminal panel, never `!`)
 
 ## Step log
@@ -27,7 +27,7 @@ Import commit: 5ddf473
 | 8 Tests | done | c92e17f | 6.12 verify_package edits included | |
 | 9 CLI | done | b43a79e | setup_host 6.10 and tests 877, 902 included | |
 | 10 Doctor | done | 700f26d | passed live: verification/doctor-20261002T083240Z.json (19 checks; worker root empty; no bk-* unit); attempts 1-3 refused by sudo -n in the agent shell |
-| 11 Live acceptance | in progress | | codex login passed (status_exit_code 0, .codex/auth.json 0600 staged; codex prints status on stderr, so the JSON status is empty); claude login passed (loggedIn true, status_exit_code 0; .claude/.credentials.json and .claude/.claude.json staged 0600, both under CLAUDE_CONFIG_DIR) |
+| 11 Live acceptance | in progress | | codex login passed (status_exit_code 0, .codex/auth.json 0600 staged; codex prints status on stderr, so the JSON status is empty); claude login passed (loggedIn true, status_exit_code 0; .claude/.credentials.json and .claude/.claude.json staged 0600, both under CLAUDE_CONFIG_DIR); codex run 1 (verification/acceptance/runs/871371c8959b42f9b7299d4330871fc9) exit 1 provider_error: gpt-6.1-sol not supported for ChatGPT accounts on codex 0.157.0; sandbox path complete (preflight, session id, collection, release; worker root empty, no bk-* unit) |
 | 12 README | pending | | |
 | 13 Provenance final pass | pending | | |
 
