@@ -312,3 +312,26 @@ Did instead: nothing to the code; the Codex acceptance is not passed. Options fo
 (b) replace the nested bwrap with a mount sandbox built by inner root in the outer unshare (no unpriv_bwrap label), then
     measure whether Codex's bwrap works there; this is a redesign beyond section 4;
 (c) accept that Codex is root-mode only on hosts with this AppArmor policy and document it.
+
+## 2026-10-02 rootless Claude acceptance and the 7.4 MCP measurement (stage 2 step 7)
+Claude acceptance passed: verification/acceptance-rootless/runs/234b34fdb8404d898649270638d7a3e9: exit 0, completed,
+exit_code 0, session c236594e-e2a2-4cf9-8a21-484fc47b9b2d, hello.txt = "hello\n" (Write tool), model claude-opus-5-5,
+permissionMode bypassPermissions (no refusal of --dangerously-skip-permissions at inner uid 1000); afterwards the worker
+root was empty through the bridge, and no sub-UID process, slirp4netns, unshare, unit record or lease remained.
+7.4 before: the system/init event lists `mcp_servers: []` and 22 tools, yet the final message says "the Exa, Slack and
+Smartling connectors need to be authorized in your claude.ai connector settings", so the account connectors reach the
+model's context without appearing in mcp_servers.
+7.4 after (`-- --strict-mcp-config`, runs/35648372318b43a6b677f4c421f17323): exit 0, completed, hello.txt = "hello\n"
+(Bash tool this time), init identical apart from run paths (`mcp_servers: []`, 22 tools), and no connector is mentioned
+anywhere in either unit's stream. No other effect observed.
+Did instead (5.4 / 7.4 enumerated edit): the Claude profile's command() adds `--strict-mcp-config` after
+`--permission-prompts none`; tests/test_profiles.py updated. This applies to root mode too (shared profile).
+
+# Owner decisions (stage 2, 2026-10-02, relayed by the worker-benchmark session)
+- Worker root at /var/tmp/worker-sandbox-<user>/worker: approved, on condition that inspect keeps refusing a worker root
+  not owned by the sub-UID base with mode 0700, that a worker root removed by systemd-tmpfiles is either recreated by
+  setup-rootless or reported clearly by inspect, and that the README states it.
+- Rootless host.json preferred when present, WORKER_SANDBOX_MODE=root forces root mode: approved; README states it;
+  a --mode option is a later-stage item only.
+- Setup jobs through a separate launcher: approved.
+- --mount-proc removed from the bridge: approved; worker_files.py unchanged.

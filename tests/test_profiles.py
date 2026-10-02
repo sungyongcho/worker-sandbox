@@ -42,13 +42,14 @@ class CommandTests(unittest.TestCase):
     def test_claude_command_without_options(self):
         self.assertEqual(claude(BINARY).command(model=None, effort=None, resume=None, extra=()), (
             BINARY, '-p', '--output-format', 'stream-json', '--verbose',
-            '--dangerously-skip-permissions', '--permission-prompts', 'none'))
+            '--dangerously-skip-permissions', '--permission-prompts', 'none', '--strict-mcp-config'))
 
     def test_claude_command_with_every_option(self):
         argv = claude(BINARY).command(model='opus', effort='high', resume='session-1', extra=('--bare',))
         self.assertEqual(argv, (
             BINARY, '-p', '--output-format', 'stream-json', '--verbose', '--dangerously-skip-permissions',
-            '--permission-prompts', 'none', '--model', 'opus', '--effort', 'high', '--resume', 'session-1', '--bare'))
+            '--permission-prompts', 'none', '--strict-mcp-config', '--model', 'opus', '--effort', 'high', '--resume',
+            'session-1', '--bare'))
         self.assertNotIn('--bare', claude(BINARY).command(model=None, effort=None, resume=None, extra=()))
 
     def test_claude_options_are_independent(self):

@@ -21,7 +21,7 @@ Verbatim import commit in this repository: 5ddf473.
 | tests/test_architecture.py | tests/test_architecture.py | 1-68 | see "test_architecture.py" below |
 | tests/fixtures.py | tests/fixtures.py | 1-236 | see "fixtures.py" below |
 | worker_sandbox/__init__.py | new | | |
-| worker_sandbox/profiles.py | new (Codex facts from benchkit/adapters.py L12, L96-99, L177-184, L265-267 and runtime.py L69-73) | | |
+| worker_sandbox/profiles.py | new; stage 2 step 7 adds --strict-mcp-config to the Claude command (brief 7.4) (Codex facts from benchkit/adapters.py L12, L96-99, L177-184, L265-267 and runtime.py L69-73) | | |
 | worker_sandbox/hostconfig.py | new | | |
 | tests/test_profiles.py | new | | |
 | tests/acceptance/empty/README.md | new (section 11.4) | | |

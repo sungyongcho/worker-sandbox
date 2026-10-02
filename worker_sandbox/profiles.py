@@ -53,7 +53,7 @@ class AgentProfile(Model):
             argv += ['-']
         elif self.name == 'claude':
             argv += ['-p', '--output-format', 'stream-json', '--verbose',
-                     '--dangerously-skip-permissions', '--permission-prompts', 'none']
+                     '--dangerously-skip-permissions', '--permission-prompts', 'none', '--strict-mcp-config']
             if model is not None:
                 argv += ['--model', model]
             if effort is not None:
