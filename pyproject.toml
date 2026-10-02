@@ -6,10 +6,22 @@ build-backend = "setuptools.build_meta"
 name = "worker-sandbox"
 version = "0.0.0.dev0"
 description = "Account-isolated sandbox that runs one coding-agent CLI invocation"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = ["msgspec==0.21.1"]
 license = "MIT"
 license-files = ["LICENSE"]
+authors = [{name = "Sungyong Cho"}]
+keywords = ["sandbox", "coding-agent", "isolation", "namespaces", "systemd", "bubblewrap", "codex", "claude-code"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: POSIX :: Linux",
+    "Development Status :: 3 - Alpha",
+    "Topic :: Security",
+]
+
+[project.urls]
+Repository = "https://github.com/sungyongcho/worker-sandbox"
 
 [project.scripts]
 worker-sandbox = "worker_sandbox.__main__:main"
