@@ -350,3 +350,11 @@ command_execution completed, hello.txt = "hello". `--dangerously-bypass-approval
 and not tried.
 Did instead: worker_sandbox/__main__.py ROOTLESS_EXTRA = {'codex': ('-c', 'sandbox_mode="danger-full-access"')},
 prepended to EXTRA ARGV only when the spec mode is rootless; tests/test_cli.py checks both modes.
+
+## 2026-10-02 rootless live acceptance, final code (stage 2 step 7 closed)
+Codex (7.3 command, no extra argv): verification/acceptance-rootless/runs/4d0a5d8c9e3b486890cc6cefc7b1a1b3: exit 0,
+completed, exit_code 0, session 01a0fc01-4f94-7aa1-b8c1-cef35d36b76d, command_execution completed, hello.txt = "hello".
+Claude (7.3 command; the profile now passes --strict-mcp-config): runs/8c0a52ba3c514b6aba074ffb72937934: exit 0,
+completed, exit_code 0, session 9d010230-aa41-4093-9e39-3a9a6f8507c0, hello.txt = "hello\n", mcp_servers [], no connector
+mentioned. After each run: worker root empty through the bridge, no sub-UID (100000) process, no slirp4netns, no unshare,
+no unit record, no lease. No sudo was used anywhere in stage 2.

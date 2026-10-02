@@ -47,13 +47,13 @@ Brief: <worker-benchmark>/SANDBOX_STAGE2_HANDOFF.md
 Base commit: bd84174
 
 ### State
-- Current step: 7 Live acceptance
-- Status: blocked
-- Last commit: this commit docs(progress): record the codex rootless stop
+- Current step: 8 README
+- Status: in progress
+- Last commit: this commit docs(progress): record the passing rootless live acceptance
 - Working tree: clean
-- Offline suite: 122 passed after the doctor fix
-- Next action: run the claude acceptance and the 7.4 MCP measurement (independent of the codex stop); then wait for the owner on codex
-- Blocked on: owner: Codex own sandbox cannot start inside bwrap on this host (HANDOFF_QUESTIONS, rootless Codex acceptance)
+- Offline suite: 125 passed at ee1af75
+- Next action: write the README "Rootless mode" section (requirements, setup-rootless, ownership model, section 9 limits and the owner-decided limits)
+- Blocked on: none
 
 ### Step log
 | Step | Status | Commit | Note |
@@ -64,6 +64,6 @@ Base commit: bd84174
 | 4 Rootless runtime | done | bdcf8bc | worker root moved out of HOME; bridge without --mount-proc; setup-job launcher | |
 | 5 CLI and provisioning | done | dc40420 | host provisioned rootless; rootless host.json preferred when present | |
 | 6 Doctor mode | done | 2ababe6, 31bffdf (fix) | attempt 2 passed: verification/doctor-rootless-20261002T093518Z.json; attempt 1 failed on the worker root parent mode | |
-| 7 Live acceptance | blocked | | credentials copied by the owner; codex run exit 0 but no hello.txt: its bwrap tool sandbox cannot start under unpriv_bwrap (stop) | |
-| 8 README | pending | | |
+| 7 Live acceptance | done | 1473ad0, ad6c33a, ee1af75 | codex runs/4d0a5d8c9e3b486890cc6cefc7b1a1b3 and claude runs/8c0a52ba3c514b6aba074ffb72937934 passed; codex needed its own sandbox off (owner decision); --strict-mcp-config added after 7.4 |
+| 8 README | in progress | | |
 | 9 Provenance and progress | pending | | |
