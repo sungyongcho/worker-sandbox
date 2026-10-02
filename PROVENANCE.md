@@ -9,7 +9,7 @@ Verbatim import commit in this repository: 5ddf473.
 | worker_sandbox/worker_files.py | benchkit/worker_files.py | 1-612 | see "worker_files.py" below |
 | worker_sandbox/worker_job.py | benchkit/worker_job.py | 1-60 | none yet |
 | worker_sandbox/worker_service.py | benchkit/worker_service.py | 1-29 | see "worker_service.py" below |
-| worker_sandbox/artifacts.py | benchkit/artifacts.py | 1-187 | none yet |
+| worker_sandbox/artifacts.py | benchkit/artifacts.py | 1-8, 10-125, 153-162, 172-180 | see "artifacts.py" below |
 | worker_sandbox/ownership.py | benchkit/ownership.py | 1-23 | none yet |
 | worker_sandbox/seed.py | benchkit/seed.py | 1-26 | none yet |
 | worker_sandbox/contracts.py | benchkit/contracts.py | 1-4, 6-11, 13-15, 17-18, 31, 35-48, 60-63, 68-91, 256-266, 505-576, 580-592 | see "contracts.py" below |
@@ -42,10 +42,32 @@ Verbatim import commit in this repository: 5ddf473.
 - step 4: deleted handle_payments and _handle_payments (L411-426) with the two blank lines after them (L427-428)
 - step 4: _job: deleted L541-542 (PAYMENT_PROVIDER_URL)
 - step 4: _observe: deleted L558-559 (handle_payments call)
+- step 5: deleted L21 `from .adapters import EVIDENCE_DIRECTORIES, auth_command` (last users native_login and collect_native_evidence deleted in this step)
+- step 5: L23 contracts import: dropped NativeSpec
+- step 5: deleted L27 `from .secrets import ...` (last users deleted in this step)
+- step 5: deleted native_login (L85-107) with its two trailing blank lines (L108-109)
+- step 5: deleted scan_tree (L198-208) with its trailing blank line
+- step 5: deleted reset (L273-280) with its trailing blank line
+- step 5: deleted remember, credential_bytes, read_credentials, sync_credentials, authentication_secrets (L300-333) with the trailing blank line
+- step 5: deleted collect_native_evidence, model_evidence, execution_request (L435-476) with the trailing blank line
+- step 5: collect_workspace: deleted L484 (scan_tree call)
+- step 5: deleted observe_workspace (L489-490) with its trailing blank line
+- step 5: release: deleted L631-632 (credential release) and L643-644 (vault forget)
+- step 5: deleted _release_credentials (L647-661) with the blank line before it
 
 ## worker_files.py
 - step 4: service_directories (L487): ('jobs', 'payment') -> ('jobs',)
 - step 4: deleted the payment_requests action (L490-492)
+- step 5: dispatch: deleted the reset (L465-478), file_identity (L493-501), observe_workspace (L502-503), session_evidence (L504-519) and native_evidence (L520-531) actions
+- step 5: list (L588): `if relative not in {'workspace', 'grade-env'}:` -> `if relative != 'workspace':`
+- step 5: no import became unused (the architecture check run against worker_sandbox reports none for this file; `re` is still used at L216)
 
 ## worker_service.py
 - step 4: deleted L12 (payment gateway Popen) and L14-15 (gateway exit check)
+
+## artifacts.py
+- step 5: deleted L9 `import shutil` (unused after the deletions below)
+- step 5: L14: `from .contracts import ArtifactRef, Snapshot, digest, make` -> `from .contracts import ArtifactRef, digest, make`
+- step 5: deleted _snapshot (L126-150) with its two trailing blank lines
+- step 5: deleted copy_artifact (L163-169) with its two trailing blank lines
+- step 5: deleted snapshot (L183-187) with the two blank lines before it

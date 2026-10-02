@@ -462,20 +462,6 @@ def dispatch(root: Path, request: dict):
                     or (not relative and info.st_mode & 0o077)):
                 raise ValueError('worker run requires private owned directories')
         return True
-    if action == 'reset':
-        # Everything the previous occupant wrote goes, except one kept top-level directory.
-        keep = request['keep']
-        if keep is not None and len(_relative_parts(keep)) != 1:
-            raise ValueError('only one top-level worker entry can be kept')
-        for path in root.iterdir():
-            if path.is_symlink() or not path.is_dir():
-                path.unlink()
-            elif path.name != keep:
-                shutil.rmtree(path)
-        root.chmod(0o700)
-        for relative in RUN_DIRECTORIES:
-            (root / relative).mkdir(mode=0o700)
-        return True
     if action == 'put':
         put_file(root, request['path'], base64.b64decode(request['data'], validate=True), request['executable'])
         return True
@@ -487,44 +473,6 @@ def dispatch(root: Path, request: dict):
         for relative in ('jobs',):
             (root / relative).mkdir(mode=0o700, exist_ok=True)
         return True
-    if action == 'file_identity':
-        try:
-            descriptor = open_file(root, request['path'], os.O_RDONLY)
-        except FileNotFoundError:
-            if request.get('optional', False):
-                return None
-            raise
-        with os.fdopen(descriptor, 'rb') as stream:
-            return file_info(stream.fileno())
-    if action == 'observe_workspace':
-        return observe_tree(root / 'workspace')
-    if action == 'session_evidence':
-        prefix = 'homes/swe/.codex/sessions'
-        folder = root / prefix
-        matches = []
-        if folder.exists():
-            for row in file_list(folder, False):
-                if not row['path'].endswith('.jsonl'):
-                    continue
-                relative = prefix + '/' + row['path']
-                with os.fdopen(open_file(root, relative, os.O_RDONLY), 'rb') as stream:
-                    first = json.loads(stream.readline())
-                if first.get('type') == 'session_meta' and first.get('payload', {}).get('id') == request['session_id']:
-                    matches.append(relative)
-        if len(matches) > 1:
-            raise ValueError('Duplicate native session evidence')
-        return matches[0] if matches else None
-    if action == 'native_evidence':
-        result = []
-        for relative in request['directories']:
-            try:
-                fd = open_file(root, relative, os.O_RDONLY | os.O_DIRECTORY)
-            except FileNotFoundError:
-                continue
-            try:
-                result.extend(relative + '/' + path for path, _ in regular_files(fd, exclude=False))
-            finally:
-                os.close(fd)
         return sorted(result)
     if action == 'file_refs':
         return file_refs(root, request['paths'])
@@ -582,7 +530,7 @@ def dispatch(root: Path, request: dict):
             raise
     if action == 'list':
         relative = request['path']
-        if relative not in {'workspace', 'grade-env'}:
+        if relative != 'workspace':
             raise ValueError('invalid tree')
         return file_list(root / relative, request['exclude'])
     if action == 'remove':

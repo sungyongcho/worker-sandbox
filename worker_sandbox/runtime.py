@@ -18,12 +18,10 @@ import time
 import uuid
 
 from . import worker_files, worker_job, worker_service, seed
-from .adapters import EVIDENCE_DIRECTORIES, auth_command
 from .artifacts import atomic_output, atomic_write, reference_file, replace_directory, safe_open, safe_read, tree_manifest
-from .contracts import ArtifactRef, ContractError, Halt, Interval, NativeSpec, RuntimeRequest, RuntimeResult, RuntimeSpec, digest, dumps, loads, make, validate
+from .contracts import ArtifactRef, ContractError, Halt, Interval, RuntimeRequest, RuntimeResult, RuntimeSpec, digest, dumps, loads, make, validate
 from .credentials import AUTH_FILE, AccountMismatch, CredentialVault, MalformedCredentials, identity, LIMIT, normalize
 from .ownership import exclusive
-from .secrets import credential_secrets, unparsed_secrets, verify_no_known_secret
 
 _UNIT = re.compile(r'bk-[0-9a-f]{32}')
 
@@ -79,31 +77,6 @@ def checked_command(argv: list[str], *, data=None, timeout=30) -> bytes:
         raise RuntimeError(f'{Path(argv[0]).name} failed ({completed.returncode}): '
                            + completed.stderr.decode(errors='replace')[:1000])
     return completed.stdout
-
-
-def native_login(spec: RuntimeSpec, model: NativeSpec) -> dict:
-    """One-time device login outside any run into a private staging CODEX_HOME, imported into the vault."""
-    control = Path(spec.control_root)
-    with exclusive(control / 'owner.lock'):
-        if (control / 'lease.json').exists():
-            raise ContractError('login runs outside any run; finish or recover the leased run first')
-        NativeRuntime.verify_model(model)
-        vault = CredentialVault(control)
-        previous = vault.load()
-        with tempfile.TemporaryDirectory(prefix='.login-', dir=control) as staging:
-            (Path(staging) / '.codex').mkdir(mode=0o700)
-            # The terminal is inherited; the device code and credentials never reach kit files.
-            completed = subprocess.run(auth_command(model, login=True), cwd=staging, check=False,
-                                       env={**control_environment(), **native_home(staging)})
-            if completed.returncode:
-                raise ContractError(f'native login failed ({completed.returncode}); vault unchanged')
-            try:
-                raw = safe_read(Path(staging) / AUTH_FILE, Path(staging), LIMIT)
-            except FileNotFoundError:
-                raise ContractError('native login left no credential file; vault unchanged') from None
-            account = vault.replace(raw)
-    return {'account_id': account,
-            'previous_account_id': identity(previous) if previous is not None else None}
 
 
 class NativeRuntime:
@@ -190,18 +163,6 @@ class NativeRuntime:
             except ValueError as exc:
                 raise ContractError(f'Invalid worker tree transfer: {exc}') from exc
 
-    def scan_tree(self, root: Path, refs, secrets):
-        """Check all staged originals before publishing any transferred evidence."""
-        for ref in refs:
-            if any(value in ref.path.encode() for value in secrets):
-                raise ContractError('Known authentication material detected in file path')
-            if ref.kind == 'symlink':
-                if any(value in ref.target.encode() for value in secrets):
-                    raise ContractError('Known authentication material detected in symlink target')
-            else:
-                with safe_open(root / ref.path, root) as stream:
-                    verify_no_known_secret(stream, secrets)
-
     def inspect(self):
         try:
             account = pwd.getpwnam(self.spec.account)
@@ -265,15 +226,6 @@ class NativeRuntime:
             self.seed_native_state()
         self.rpc('check')
 
-    def reset(self, *, keep=None):
-        """Recreate this run's whole worker root from the pristine workspace, optionally keeping one top-level entry."""
-        if loads(safe_read(self.lease, self.control), dict) != {'run': str(self.run)}:
-            raise ContractError('worker lease does not belong to this run')
-        if self.service_active or not self.confirm_stopped():
-            raise ContractError('worker reset requires a stopped run service and no worker processes')
-        self.rpc('reset', keep=keep)
-        self.populate()
-
     def seed_native_state(self):
         """Inject only the selected credentials, and a CUSTOM cell's frozen profile, into the implementer HOME."""
         home = 'homes/swe/.codex/'
@@ -291,41 +243,6 @@ class NativeRuntime:
         if raw is not None:
             self.remember(raw)
             self.put('homes/swe/' + AUTH_FILE, raw)
-
-    def remember(self, raw):
-        """Keep every injected or read-back credential value in this run's private scan set."""
-        CredentialVault(self.control).remember(self.run.name, credential_secrets(raw))
-
-    def credential_bytes(self):
-        raw = self.rpc('read', path='homes/swe/' + AUTH_FILE, limit=LIMIT, optional=True)
-        return base64.b64decode(raw, validate=True) if raw is not None else None
-
-    def read_credentials(self):
-        raw = self.credential_bytes()
-        return normalize(raw) if raw is not None else None
-
-    def sync_credentials(self):
-        """After each native call, carry a same-account refresh back to the vault; newest wins."""
-        if loads(safe_read(self.lease, self.control), dict) != {'run': str(self.run)}:
-            raise ContractError('worker lease does not belong to this run')
-        raw = self.read_credentials()
-        if raw is None:
-            return 'missing'
-        self.remember(raw)
-        return 'refreshed' if CredentialVault(self.control).refresh(raw) else 'unchanged'
-
-    def authentication_secrets(self):
-        """Scan every injected and read-back credential, plus the vault value, before publishing evidence.
-
-        A HOME credential that no longer parses is still scanned for, so it never blocks collection."""
-        values = set(CredentialVault(self.control).seen(self.run.name))
-        for raw in (CredentialVault(self.control).load(), self.credential_bytes()):
-            if raw is not None:
-                try:
-                    values.update(credential_secrets(raw))
-                except MalformedCredentials:
-                    values.update(unparsed_secrets(raw))
-        return tuple(values)
 
     def worker_path(self, relative: str) -> str:
         return str(self.remote / relative)
@@ -401,62 +318,15 @@ class NativeRuntime:
         self.service_active = self.service_active and not (native and network)
         return native and network
 
-    def collect_native_evidence(self, archive=None):
-        """Archive complete stopped native files, excluding authentication explicitly."""
-        if not self.confirm_stopped():
-            raise ContractError('Native evidence collection requires stopped processes')
-        references = []
-        secrets = self.authentication_secrets() if self.authentication else ()
-        directories = ['jobs', 'workspace/.git', *('homes/swe/' + p for p in EVIDENCE_DIRECTORIES)]
-        paths = self.rpc('native_evidence', directories=directories)
-        refs = tuple(make(ArtifactRef, **row) for row in self.rpc('file_refs', paths=paths))
-        if any(ref.kind != 'file' for ref in refs):
-            raise ContractError('Native evidence must contain regular files')
-        archive = self.run / 'archive' if archive is None else Path(archive)
-        with tempfile.TemporaryDirectory(prefix='.archive-', dir=self.run) as temp:
-            staging = Path(temp) / 'tree'
-            self.download_tree(staging, refs)
-            self.scan_tree(staging, refs, secrets)
-            # Validate every pre-existing original before publishing any new entry.
-            for ref in refs:
-                target = archive / ref.path
-                if os.path.lexists(target):
-                    old = reference_file(target, archive)
-                    if (old.digest, old.size, old.executable) != (ref.digest, ref.size, ref.executable):
-                        raise ContractError('Archived native evidence differs from stopped source')
-            for ref in refs:
-                target = archive / ref.path
-                if not os.path.lexists(target):
-                    os.close(worker_files.directory_fd(target.parent, create=True))
-                    with safe_open(staging / ref.path, staging) as source, atomic_output(target) as output:
-                        for chunk in worker_files.file_chunks(source.fileno()):
-                            output.write(chunk)
-                        os.fchmod(output.fileno(), 0o700 if ref.executable else 0o600)
-                references.append(reference_file(target, self.run))
-        return tuple(references)
-
-    def model_evidence(self, session_id, destination):
-        relative = self.rpc('session_evidence', session_id=session_id)
-        if relative is None:
-            return None
-        return self.download(relative, destination)
-
-    def execution_request(self, unit_name):
-        return self.read('jobs/' + unit_name + '/request.json')
-
     def collect_workspace(self):
         """Replace the controller mirror only after a complete verified transfer."""
         refs = self.files('workspace', exclude=True)
         with tempfile.TemporaryDirectory(prefix='.collect-', dir=self.run) as temp:
             target = Path(temp) / 'workspace'
             self.download_tree(target, refs, relative='workspace')
-            self.scan_tree(target, refs, self.authentication_secrets() if self.authentication else ())
             if refs != self.files('workspace', exclude=True):
                 raise ContractError('workspace changed during collection')
             replace_directory(target, self.run / 'workspace')
-
-    def observe_workspace(self):
-        return self.rpc('observe_workspace')
 
     def service_command(self, request: RuntimeRequest, job: Path, *, read_only=()) -> list[str]:
         request = validate(request, RuntimeRequest)
@@ -593,8 +463,6 @@ class NativeRuntime:
 
     def release(self):
         """Only after sealing: discard worker state while retaining private results."""
-        if self.authentication and self.lease.exists() and not self.rpc('empty'):
-            self._release_credentials()
         with exclusive(self.control / 'owner.lock'):
             if not self.lease.exists():
                 return
@@ -605,22 +473,4 @@ class NativeRuntime:
             self.rpc('remove')
             if not self.rpc('empty'):
                 raise ContractError('worker state remains; refusing to release the account')
-            if self.authentication:
-                CredentialVault(self.control).forget(self.run.name)
             self.lease.unlink()
-
-    def _release_credentials(self):
-        """Final read-back; a missing, malformed or other-account file is recorded, never a reason to retain the lease."""
-        if not self.confirm_stopped():
-            raise ContractError('stop worker processes before releasing credentials')
-        try:
-            detail = {'missing': 'implementer credential file was missing at release; vault unchanged'}.get(
-                self.sync_credentials())
-        except AccountMismatch as exc:
-            detail = str(exc)
-        except MalformedCredentials:
-            name = CredentialVault(self.control).keep_malformed(self.credential_bytes())
-            detail = f'implementer credential file was malformed at release; private copy preserved as {name}; vault unchanged'
-        if detail is not None:
-            atomic_write(self.run / 'artifacts' / f'credential-release-{uuid.uuid4().hex}.json',
-                         dumps({'run_id': self.run.name, 'detail': detail}))

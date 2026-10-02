@@ -6,12 +6,11 @@ import ctypes
 import errno
 import os
 from pathlib import Path
-import shutil
 import stat
 import tempfile
 from typing import Iterator
 
-from .contracts import ArtifactRef, Snapshot, digest, make
+from .contracts import ArtifactRef, digest, make
 from .worker_files import directory_fd, file_chunks, file_info, open_file, regular_files
 
 
@@ -123,33 +122,6 @@ def replace_directory(source: Path, destination: Path) -> None:
         _rename_directory(source, destination, exchange=True)
 
 
-def _snapshot(source: Path, destination: Path, *, exclude_generated: bool = True) -> dict:
-    source, destination = Path(source).absolute(), Path(destination).absolute()
-    if source == destination or source in destination.parents:
-        raise ValueError('snapshot destination must be outside the source tree')
-    if os.path.lexists(destination):
-        raise FileExistsError(str(destination))
-    with _directory(destination.parent):
-        pass
-    temporary = Path(tempfile.mkdtemp(prefix='.' + destination.name + '.', dir=destination.parent))
-    try:
-        kwargs = dict(exclude_generated=exclude_generated)
-        before = _manifest(source, **kwargs)
-        copied = _manifest(source, destination=temporary, **kwargs)
-        after = _manifest(source, **kwargs)
-        if before != copied or before != after:
-            raise ValueError('source changed while snapshotting')
-        _references(copied)
-        for directory, _, _ in os.walk(temporary, topdown=False):
-            _sync_directory(Path(directory))
-        _rename_directory(temporary, destination)
-        _sync_directory(destination.parent)
-        return copied
-    finally:
-        if temporary.exists():
-            shutil.rmtree(temporary)
-
-
 def atomic_write(path: Path, data: bytes) -> ArtifactRef:
     """Publish a new artifact and return its basename-relative identity."""
     if not isinstance(data, bytes):
@@ -158,15 +130,6 @@ def atomic_write(path: Path, data: bytes) -> ArtifactRef:
     with atomic_output(Path(path)) as stream:
         stream.write(data)
     return reference
-
-
-def copy_artifact(source: Path, destination: Path, root: Path, expected: ArtifactRef) -> ArtifactRef:
-    with atomic_output(destination) as output, safe_open(source, root) as stream:
-        info = file_info(stream.fileno(), output)
-        result = make(ArtifactRef, path=destination.name, **info)
-        if (result.size, result.digest) != (expected.size, expected.digest):
-            raise ValueError('evidence changed while being copied')
-    return result
 
 
 def _references(manifest: dict) -> tuple[ArtifactRef, ...]:
@@ -178,10 +141,3 @@ def _references(manifest: dict) -> tuple[ArtifactRef, ...]:
 
 def tree_manifest(root: Path, *, exclude_generated: bool = True) -> tuple[ArtifactRef, ...]:
     return _references(_manifest(Path(root), exclude_generated=exclude_generated))
-
-
-def snapshot(source: Path, destination: Path, *, run_id: str,
-             exclude_generated: bool = True) -> Snapshot:
-    make(Snapshot, run_id=run_id, digest=digest(()), files=())
-    files = _references(_snapshot(Path(source), Path(destination), exclude_generated=exclude_generated))
-    return make(Snapshot, run_id=run_id, digest=digest(files), files=files)

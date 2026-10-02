@@ -30,3 +30,22 @@ Did instead: used L102-106 as the model (applied in step 6).
 Expected: "Docstring L359-362: delete the second sentence about the payment ledger; keep the first" (section 6.7).
 Observed: the docstring opens on L358; L359 is blank, L360-361 hold the second sentence, L362 closes it.
 Did instead: kept L358 with closing quotes added, deleted L359-362. Same meaning, one line earlier.
+
+## 2026-10-02 worker_sandbox/runtime.py:109
+Expected: rpc is "unchanged" (section 6.7), and the native_evidence bridge action is deleted (section 6.4).
+Observed: rpc keeps `timeout=None if action in {'list', 'file_refs', 'native_evidence'} else 30`;
+the 'native_evidence' member now names an action that no longer exists. It is harmless.
+Did instead: nothing; left rpc byte-for-byte as R2 requires. The owner may approve dropping the member.
+
+## 2026-10-02 worker_sandbox/runtime.py:21
+Expected: section 6.7 lists the runtime import deletions; section 12 splits the work over steps 4, 5 and 7.
+Observed: the brief does not say in which step each import line goes.
+Did instead: each import line is deleted in the step that removes its last user: payment_gateway and
+payment_fixture in step 4; adapters, secrets and NativeSpec in step 5; credentials in step 7, because
+seed_native_state still uses AUTH_FILE and CredentialVault until step 7 replaces its body. Between
+steps 5 and 7, seed_native_state calls the deleted remember(); the package does not run before step 8.
+
+## 2026-10-02 worker_sandbox/worker_files.py:9
+Expected: "`re` is used by `payment_requests` only; check with the architecture test, do not guess" (section 6.4).
+Observed: `re` is also used in push_tree's digest check (L216 at 8bb76be).
+Did instead: kept `import re`.
