@@ -47,12 +47,12 @@ Brief: <worker-benchmark>/SANDBOX_STAGE2_HANDOFF.md
 Base commit: bd84174
 
 ### State
-- Current step: 4 Rootless runtime
+- Current step: 5 CLI and provisioning
 - Status: in progress
-- Last commit: this commit feat: add rootless fields to the runtime spec
+- Last commit: this commit feat: add the rootless runtime
 - Working tree: clean
-- Offline suite: 104 passed at this commit
-- Next action: write worker_sandbox/rootless.py (5.2) and rootless_init.py (5.3) with tests/test_rootless.py argv, rules and state tests
+- Offline suite: 117 passed at this commit; verify_package passed: verification/package-20261002T093119Z.json
+- Next action: add runtime_class and setup-rootless to the CLI (5.4) with tests, then provision this host rootless
 - Blocked on: none
 
 ### Step log
@@ -60,9 +60,9 @@ Base commit: bd84174
 | --- | --- | --- | --- |
 | 1 Record the start | done | 1782c85 | owner approved starting stage 2 and running the doctor and live acceptance directly |
 | 2 Reproduce M8 | done | 8603228 | m8 and runtime variants passed; /run needs the resolver bound at the symlink target | |
-| 3 Contracts | done | this commit | stage 1 host.json byte test now compares the decoded spec | |
-| 4 Rootless runtime | in progress | | |
-| 5 CLI and provisioning | pending | | |
+| 3 Contracts | done | 7ae6eeb | stage 1 host.json byte test now compares the decoded spec | |
+| 4 Rootless runtime | done | this commit | worker root moved out of HOME; bridge without --mount-proc; setup-job launcher | |
+| 5 CLI and provisioning | in progress | | |
 | 6 Doctor mode | pending | | |
 | 7 Live acceptance | pending | | |
 | 8 README | pending | | |

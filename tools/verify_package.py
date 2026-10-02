@@ -51,7 +51,7 @@ def offline_guard(event, arguments):
         raise RuntimeError("network access is forbidden in offline package tests")
     if event == "subprocess.Popen":
         executable = Path(arguments[0]).absolute()
-        if executable.name in {"sudo", "systemctl", "systemd-run", "codex", "claude"} and not executable.is_relative_to(temporary):
+        if executable.name in {"sudo", "systemctl", "systemd-run", "codex", "claude", "unshare", "bwrap", "slirp4netns", "nft", "setpriv", "newuidmap"} and not executable.is_relative_to(temporary):
             raise RuntimeError("live privileged/provider executable is forbidden in offline package tests")
 
 sys.addaudithook(offline_guard)

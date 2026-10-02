@@ -146,6 +146,7 @@ Verbatim import commit in this repository: 5ddf473.
 - step 8: stripped environment: JEV_API_KEY -> ANTHROPIC_API_KEY and CLAUDE_CODE_OAUTH_TOKEN
 - step 8: temporary directory prefix benchkit-verification- -> worker-sandbox-verification-
 - step 8: no schema export check exists in the carried file; nothing dropped
+- stage 2 step 4: offline guard blocks unshare, bwrap, slirp4netns, nft, setpriv and newuidmap as well (stage 2 brief 5.7)
 
 ## setup_host.py
 - step 9: L16-18 constants: new defaults worker-sandbox, /var/lib/worker-sandbox-worker, /var/lib/worker-sandbox-controller; added PYTHON = '/usr/bin/python3'

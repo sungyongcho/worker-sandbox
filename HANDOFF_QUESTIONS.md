@@ -223,3 +223,47 @@ contracts.dumps(RuntimeSpec) now includes mode, subuid_base and subgid_base, so 
 setup_host.host_document to the exact dumps bytes failed.
 Did instead: tests/test_cli.py HostConfigTests now asserts that setup_host's bytes load to the same RuntimeSpec; setup_host.py unchanged.
 inspect()'s informational runtime_digest changes value for root mode because the digest covers the new fields.
+
+## 2026-10-02 worker_sandbox/rootless.py:46 worker root default (stage 2 step 4)
+Expected: worker_root default `$XDG_STATE_HOME/worker-sandbox/worker`, owned by the sub-UID (stage 2, 4.3).
+Observed: /home/<user> is 0750 and ~/.local, ~/.local/state are 0700, so host uid 100000 (inner 1000) cannot traverse to
+anything under HOME; neither the bridge nor bwrap's bind source could reach that worker root. For the same reason the
+4.4 read-only bind of an agent binary under /home cannot work on this host (root-owned copies are unaffected).
+Did instead: default worker_root `/var/tmp/worker-sandbox-<user>/worker`; its parent is controller-owned 0711 (traversable,
+not listable) and the worker root itself is sub-UID-owned 0700. The control root stays at
+`$XDG_STATE_HOME/worker-sandbox/controller`. verify_model refuses a binary whose directories other users cannot traverse,
+so a binary under a private HOME fails early with a clear message. Owner to confirm the location.
+
+## 2026-10-02 worker_sandbox/rootless.py:135 bridge without --mount-proc
+Expected: the bridge argv `unshare --user <map> --mount --mount-proc -- setpriv ...` (5.2).
+Observed: `unshare: mount /proc failed: Operation not permitted` (a new /proc needs a pid namespace owned by the new user
+namespace). Without --mount-proc the bridge runs as uid 1000, gid 1000, no groups.
+Did instead: dropped only --mount-proc from the bridge (S4: remove the offending option, record it).
+
+## 2026-10-02 worker_sandbox/rootless.py:233 setup jobs through a launcher
+Expected: setup jobs run as a one-shot `unshare ... bwrap ...` through service_command with network=False; invoke is inherited (5.2).
+Observed: inherited invoke launches with `checked_command(service_command(...), timeout=10)` and then observes; a one-shot
+sandbox would block inside checked_command until the job ends and fail any job longer than 10 s (the doctor's provider
+HTTPS probe alone can take longer).
+Did instead: for network=False, service_command returns a tiny launcher argv that starts the one-shot chain in a new
+session, records its pid and start time in `<control>/units/<unit>.json`, and exits at once, as systemd-run does.
+state() and cleanup() read the same unit records, which also lets `recover` find a crashed controller's processes.
+
+## 2026-10-02 worker_sandbox/rootless.py:205 sandbox mount order
+Expected: Appendix A order, with `--tmpfs /run --remount-ro /run` (4.1) and `--ro-bind <resolv> /etc/resolv.conf`.
+Observed: see the step 2 entry for /run; additionally `--remount-ro /var` before the worker-root bind would stop bwrap from
+creating the mount point of a worker root under /var/tmp.
+Did instead: `--remount-ro /var` follows the binds; the resolver is bound at the /etc/resolv.conf symlink target in the
+/run tmpfs. Same options as Appendix A otherwise.
+
+## 2026-10-02 worker_sandbox/rootless.py:158 verify_model in rootless mode
+Expected: "root-owned requirement replaced by 'the binary and its directory are not writable by the sandbox'" (4.4).
+Did instead: the binary must be readable and executable by other users and not world-writable, and every parent directory
+must be traversable by other users and not world-writable unless sticky; the digest check is unchanged. Inside the sandbox
+the whole host tree is read-only, so the binary cannot be changed there.
+
+## 2026-10-02 worker_sandbox/rootless.py:62 provisioning the worker root
+Expected: setup-rootless creates worker_root "through the bridge (inner 1000 creates it)" (5.4).
+Observed: inner 1000 (host sub-UID) cannot create a directory in a controller-owned parent.
+Did instead: provision() has inner root create the directory and chown it to inner 1000 in one `unshare --user <map>`
+call; the host owner is the sub-UID base, mode 0700 (measured: 700 100000:100000, the controller cannot list it).
