@@ -186,4 +186,9 @@ account connectors (for example through settings or an environment variable).
 Expected: `run --resume SESSION` in a new run continues the session (11.4), with a new run, claim and service (section 9).
 Observed before running it: section 8 discards the agent HOME at release, and both agents keep session transcripts
 there (.claude/projects, .codex/sessions). A resumed run starts from a fresh HOME, so the agent may not find the session.
-Did instead: ran the resume as written to collect evidence; the result is recorded under step 11 in PROGRESS.md.
+Did instead: ran the resume as written to collect evidence. Result (verification/acceptance/runs/fad51dfa6fed448a87d36aaa1cfd9e7f):
+exit 1, provider_error in 0.5 s, no model call; stream `result` error_during_execution with
+"No conversation found with session ID: fa7d3db4-bf4d-49fd-bb16-d37f54e0d077"; hello.txt unchanged; worker root empty,
+no bk-* unit, no lease. The sandbox path worked; the session transcript left with the discarded HOME.
+Carrying sessions across runs needs either reading the worker HOME (the bridge `list` refuses any tree but `workspace`,
+6.4) or keeping one service across CLI calls (section 9 defers it). Both are outside stage 1. Blocked; owner decides.
