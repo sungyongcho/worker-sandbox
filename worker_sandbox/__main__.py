@@ -68,7 +68,12 @@ def setup_rootless(args) -> dict:
     """Rootless provisioning, no root: a private control root and a sub-UID-owned worker root."""
     spec = rootless.default_spec()
     if hostconfig.path(spec.control_root).exists():
-        raise c.ContractError(f'{hostconfig.path(spec.control_root)} exists; inspect it rather than overwriting it')
+        recorded = hostconfig.read(spec.control_root)
+        if recorded.mode != 'rootless' or os.path.lexists(recorded.worker_root):
+            raise c.ContractError(f'{hostconfig.path(spec.control_root)} exists; inspect it rather than overwriting it')
+        # Only the worker root is gone (systemd-tmpfiles cleans /var/tmp): recreate it as recorded.
+        return {'host': str(hostconfig.path(spec.control_root)), 'spec': recorded, 'repaired': True,
+                **rootless.check_host(), **rootless.provision_worker(recorded)}
     checks = rootless.check_host()
     created = rootless.provision(spec)
     return {'host': str(hostconfig.write(spec)), 'spec': spec, **created, **checks}

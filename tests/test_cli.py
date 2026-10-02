@@ -262,11 +262,27 @@ class RootlessSelectionTests(unittest.TestCase):
     def test_setup_rootless_refuses_an_existing_host_config(self):
         self.control.mkdir(parents=True, mode=0o700)
         hostconfig.write(self.spec)
+        Path(self.spec.worker_root).mkdir(parents=True)
         with patch.object(cli.rootless, 'default_spec', return_value=self.spec), \
              patch.object(cli.rootless, 'provision') as provision, \
+             patch.object(cli.rootless, 'provision_worker') as worker, \
              self.assertRaisesRegex(c.ContractError, 'exists'):
             cli.setup_rootless(cli.parse(['setup-rootless']))
         provision.assert_not_called()
+        worker.assert_not_called()
+
+    def test_setup_rootless_recreates_only_a_removed_worker_root(self):
+        self.control.mkdir(parents=True, mode=0o700)
+        hostconfig.write(self.spec)
+        with patch.object(cli.rootless, 'default_spec', return_value=self.spec), \
+             patch.object(cli.rootless, 'check_host', return_value={'apparmor_restricted': True}), \
+             patch.object(cli.rootless, 'provision_worker', return_value={'worker_root': self.spec.worker_root,
+                                                                         'worker_owner': 100000}) as worker, \
+             patch.object(cli.rootless, 'provision') as provision:
+            result = cli.setup_rootless(cli.parse(['setup-rootless']))
+        worker.assert_called_once_with(self.spec)
+        provision.assert_not_called()
+        self.assertTrue(result['repaired'])
 
     def test_setup_rootless_provisions_then_records_the_spec(self):
         self.control.parent.mkdir(parents=True)

@@ -335,3 +335,7 @@ Did instead (5.4 / 7.4 enumerated edit): the Claude profile's command() adds `--
   a --mode option is a later-stage item only.
 - Setup jobs through a separate launcher: approved.
 - --mount-proc removed from the bridge: approved; worker_files.py unchanged.
+- Implemented (owner condition on the worker root): inspect refuses a missing worker root with a message naming
+  systemd-tmpfiles and `worker-sandbox setup-rootless`; setup-rootless, when the rootless host.json exists and only its
+  worker root is gone, recreates the worker root as recorded (provision_worker) and reports `repaired: true`; otherwise
+  it still refuses an existing host.json. The owner and 0700 checks in inspect are unchanged.

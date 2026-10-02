@@ -91,13 +91,24 @@ def provision(spec: RuntimeSpec) -> dict:
         raise ContractError('rootless roots already exist; inspect them before provisioning')
     control.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     control.mkdir(mode=0o700)
+    return {'control_root': str(control), **provision_worker(spec)}
+
+
+def provision_worker(spec: RuntimeSpec) -> dict:
+    """Create the worker root; also used when systemd-tmpfiles removed an unused one under /var/tmp."""
+    worker = Path(spec.worker_root)
+    if os.path.lexists(worker):
+        raise ContractError(f'{worker} already exists; inspect it before provisioning')
     # The bridge opens every ancestor O_RDONLY|O_DIRECTORY, so the sub-UID needs read, not only search, on the parent.
-    worker.parent.mkdir(mode=0o755)
+    worker.parent.mkdir(mode=0o755, exist_ok=True)
+    info = worker.parent.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+        raise ContractError(f'{worker.parent} must be a directory owned by this user')
     worker.parent.chmod(0o755)
     # Inner root creates the worker root and hands it to inner 1000, so its host owner is the sub-UID.
     creator = 'import os,sys; os.mkdir(sys.argv[1], 0o700); os.chown(sys.argv[1], 1000, 1000)'
     checked_command(['/usr/bin/unshare', '--user', *mapping(spec), '--', spec.python, '-I', '-c', creator, str(worker)])
-    return {'control_root': str(control), 'worker_root': str(worker), 'worker_owner': worker.lstat().st_uid}
+    return {'worker_root': str(worker), 'worker_owner': worker.lstat().st_uid}
 
 
 def nft_rules(addresses: list) -> str:
@@ -149,6 +160,9 @@ class RootlessRuntime(NativeRuntime):
         if (ranges['/etc/subuid'], ranges['/etc/subgid']) != (self.spec.subuid_base, self.spec.subgid_base):
             raise ContractError('host.json subordinate bases differ from /etc/subuid and /etc/subgid')
         restricted = check_host()['apparmor_restricted']
+        if not os.path.lexists(self.spec.worker_root):
+            raise ContractError(f'{self.spec.worker_root} is missing (systemd-tmpfiles may remove unused directories under '
+                                '/var/tmp); run `worker-sandbox setup-rootless` to recreate it')
         for path, uid, mode in ((self.control, os.getuid(), None), (Path(self.spec.worker_root), self.spec.subuid_base, 0o700),
                                 (self.run.parent.parent, os.getuid(), None)):
             info = path.lstat()

@@ -136,6 +136,12 @@ class RootlessTests(unittest.TestCase):
              self.assertRaisesRegex(c.ContractError, 'requires /nonexistent/unshare'):
             self.runtime.inspect()
 
+    def test_inspect_names_a_removed_worker_root(self):
+        with patch.object(rootless, 'sub_base', return_value=100000), \
+             patch.object(rootless, 'check_host', return_value={'apparmor_restricted': True}), \
+             self.assertRaisesRegex(c.ContractError, 'missing .*setup-rootless'):
+            self.runtime.inspect()
+
     def test_sub_base_reads_the_user_entry(self):
         with tempfile.NamedTemporaryFile('w') as table:
             table.write('other:200000:65536\ntester:100000:65536\n')
