@@ -8,17 +8,17 @@ Import commit: not yet
 ## State
 - Current step: 2 Verbatim import
 - Status: in progress
-- Last commit: this commit chore: scaffold the repository
+- Last commit: d6b35ec chore: scaffold the repository
 - Working tree: clean
-- Offline suite: not run since this commit (no code yet)
+- Offline suite: not run since d6b35ec (no code yet)
 - Next action: copy every file in section 4.1 byte-for-byte with cp, compare with cmp, commit as the verbatim import, then record the import hash
 - Blocked on: none
 
 ## Step log
 | Step | Status | Commit | Note |
 | --- | --- | --- | --- |
-| 1 Scaffold | done | this commit | |
-| 2 Verbatim import | in progress | | |
+| 1 Scaffold | done | d6b35ec | |
+| 2 Verbatim import | in progress | | import commit holds only the copies (R1); its hash is recorded in a following docs commit |
 | 3 Contracts subset | pending | | |
 | 4 Remove the payment fixture | pending | | |
 | 5 Remove evidence and vault features | pending | | |
