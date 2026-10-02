@@ -192,3 +192,11 @@ exit 1, provider_error in 0.5 s, no model call; stream `result` error_during_exe
 no bk-* unit, no lease. The sandbox path worked; the session transcript left with the discarded HOME.
 Carrying sessions across runs needs either reading the worker HOME (the bridge `list` refuses any tree but `workspace`,
 6.4) or keeping one service across CLI calls (section 9 defers it). Both are outside stage 1. Blocked; owner decides.
+
+## 2026-10-02 brief sections 9 and 11.4 (owner decision)
+Brief contradiction: section 9 makes a resume a new run with a new claim and a new service, and 11.4 asks for resume
+acceptance, but section 8 removes the agent HOME, where both agents keep session transcripts, at every release.
+Owner decision: run-to-run resume is not supported in stage 1. No code change. The two 11.4 resume items are closed as
+"not supported by design, not run" (the claude resume above is the evidence; the codex resume was not run). The argv
+position of --resume is covered offline by tests/test_profiles.py. The README states the limitation with its cause.
+Session preservation (evidence_directories) is a later-stage item; the brief is corrected in worker-benchmark after stage 1.
