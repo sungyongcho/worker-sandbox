@@ -175,3 +175,15 @@ Observed: `worker-sandbox login --profile claude` with claude 2.1.286 staged `.c
 entry would always be skipped as missing.
 Did instead (owner approved): credential_files = ('.claude/.credentials.json', '.claude/.claude.json'); tests/test_profiles.py
 pins the credential files of every profile.
+
+## 2026-10-02 verification/acceptance/runs/6869265f80344f1a9f135dc16c9693d1
+Observation from the claude acceptance run (passed): the final message says the claude.ai Exa, Slack and Smartling
+connectors need authorization, so the account's remote MCP connectors load inside the sandbox from the staged login.
+Did instead: nothing; stage 1 copies the login as the brief says. Owner to decide in stage 2 whether runs disable
+account connectors (for example through settings or an environment variable).
+
+## 2026-10-02 section 11.4 resume
+Expected: `run --resume SESSION` in a new run continues the session (11.4), with a new run, claim and service (section 9).
+Observed before running it: section 8 discards the agent HOME at release, and both agents keep session transcripts
+there (.claude/projects, .codex/sessions). A resumed run starts from a fresh HOME, so the agent may not find the session.
+Did instead: ran the resume as written to collect evidence; the result is recorded under step 11 in PROGRESS.md.
