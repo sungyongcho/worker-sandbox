@@ -6,13 +6,13 @@ Repository: <worker-sandbox>
 Import commit: 5ddf473
 
 ## State
-- Current step: 10 Doctor
+- Current step: 11 Live acceptance
 - Status: in progress
-- Last commit: 700f26d feat: add the host doctor from verify_host
+- Last commit: test: add the empty acceptance workspace
 - Working tree: clean
-- Offline suite: 100 passed at 700f26d; verify_package passed: verification/package-20261002T082846Z.json
-- Next action: owner runs sudo -v and the doctor in a real terminal outside the agent shell, then reports the report path; read it and judge it against section 11.3
-- Blocked on: owner: doctor attempts 1-3 (verification/doctor-20261002T082941Z.json, doctor-20261002T083001Z.json, doctor-20261002T083157Z.json) ran through the agent shell (`!` input), where sudo -n has no cached credential (sudo timestamps are per terminal); both stopped at the first sudo -n with no lease and no state change; the owner must type the command directly into the terminal pane where sudo -v succeeded
+- Offline suite: 100 passed after the login fix (pip install the repo into .venv before running)
+- Next action: owner runs `worker-sandbox login --profile codex --binary <root-owned codex>` in a terminal tab; then claude login, then the two runs and the resumes of section 11.4, judging each result.json
+- Blocked on: owner: interactive login and sudo -v for the runs (run through the terminal panel, never `!`)
 
 ## Step log
 | Step | Status | Commit | Note |
@@ -26,8 +26,8 @@ Import commit: 5ddf473
 | 7 Profiles and host config | done | 934adfa | |
 | 8 Tests | done | c92e17f | 6.12 verify_package edits included | |
 | 9 CLI | done | b43a79e | setup_host 6.10 and tests 877, 902 included | |
-| 10 Doctor | blocked | 700f26d | attempts 1-3 refused by sudo -n in the agent shell; rerun typed directly in the owner terminal |
-| 11 Live acceptance | pending | | owner present |
+| 10 Doctor | done | 700f26d | passed live: verification/doctor-20261002T083240Z.json (19 checks; worker root empty; no bk-* unit); attempts 1-3 refused by sudo -n in the agent shell |
+| 11 Live acceptance | in progress | | owner present |
 | 12 README | pending | | |
 | 13 Provenance final pass | pending | | |
 
