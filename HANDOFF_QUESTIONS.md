@@ -49,3 +49,29 @@ steps 5 and 7, seed_native_state calls the deleted remember(); the package does 
 Expected: "`re` is used by `payment_requests` only; check with the architecture test, do not guess" (section 6.4).
 Observed: `re` is also used in push_tree's digest check (L216 at 8bb76be).
 Did instead: kept `import re`.
+
+## 2026-10-02 worker_sandbox/runtime.py:1
+Expected: "After these edits the file should be roughly 420 lines" (section 6.7).
+Observed: 472 lines after step 7. Count of the enumerated hunks: 661 source lines, 194 deleted
+(imports 6, native_home 7, native_login 25, __init__ 4, scan_tree 12, reset 9, the five credential
+methods 35, start_run 7, payment handlers 18, evidence methods 43, collect_workspace 1,
+observe_workspace 3, _job 2, _observe 2, release 4, _release_credentials 16), 5 net added
+(profiles import, __init__ lines, _job environment and passthrough, minus 3 in seed_native_state).
+Did instead: nothing; the estimate in the brief appears to be low. `git diff 5ddf473 -- worker_sandbox/runtime.py`
+shows only the enumerated hunks.
+
+## 2026-10-02 worker_sandbox/runtime.py:373
+Expected: the _job passthrough copies every `agent.credential_env` name present in os.environ, and
+"--env NAME passes through at most the names in profile.credential_env" (sections 6.7, 6.9, 8).
+Observed: if the runtime alone decides, a key exported in the owner's shell crosses into the job even
+without `--env`.
+Did instead: runtime.py follows section 6.7 exactly. In step 9 the CLI narrows the profile it hands to
+NativeRuntime to the names given with `--env` (msgspec.structs.replace on credential_env), so nothing
+crosses unless `--env` names it.
+
+## 2026-10-02 worker_sandbox/hostconfig.py:13
+Expected: setup-host accepts `--control-root`; doctor, login, run and recover read host.json (section 6.9).
+Observed: the brief gives the other commands no way to learn a non-default control root.
+Did instead: hostconfig.read() takes an optional control_root and defaults to /var/lib/worker-sandbox-controller.
+A host provisioned with a custom --control-root needs a way to point the CLI at it; owner to decide
+(for example a --control-root option on every command).

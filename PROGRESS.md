@@ -6,12 +6,12 @@ Repository: <worker-sandbox>
 Import commit: 5ddf473
 
 ## State
-- Current step: 7 Profiles and host config
+- Current step: 8 Tests
 - Status: in progress
-- Last commit: this commit refactor: parameterize the account, roots and agent home
+- Last commit: this commit feat: add agent profiles and host configuration
 - Working tree: clean
 - Offline suite: 2 passed, 2 import errors (tests still import benchkit until step 8) at this commit; run from the repository root with .venv/bin/python -I -B -m unittest discover -s tests
-- Next action: write profiles.py and hostconfig.py, apply the 6.7 __init__ signature, native_home deletion, seed_native_state body and _job environment hunks, delete the credentials import, then delete exactly the unused imports the architecture check names
+- Next action: port tests per section 10 (fixtures subset, test_runtime dispositions, test_bulk_transfer, test_architecture ROOT, new test_profiles.py), apply 6.12 to tools/verify_package.py, then run the suite until it passes
 - Blocked on: none
 
 ## Step log
@@ -22,9 +22,9 @@ Import commit: 5ddf473
 | 3 Contracts subset | done | 8881c72 | |
 | 4 Remove the payment fixture | done | ffae987 | |
 | 5 Remove evidence and vault features | done | b9aa4bc | |
-| 6 Parameterize | done | this commit | |
-| 7 Profiles and host config | in progress | | |
-| 8 Tests | pending | | |
+| 6 Parameterize | done | 17f7f42 | |
+| 7 Profiles and host config | done | this commit | |
+| 8 Tests | in progress | | |
 | 9 CLI | pending | | |
 | 10 Doctor | pending | | owner present for sudo -v |
 | 11 Live acceptance | pending | | owner present |

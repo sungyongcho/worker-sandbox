@@ -21,6 +21,8 @@ Verbatim import commit in this repository: 5ddf473.
 | tests/test_architecture.py | tests/test_architecture.py | 1-68 | none yet |
 | tests/fixtures.py | tests/fixtures.py | 1-236 | none yet |
 | worker_sandbox/__init__.py | new | | |
+| worker_sandbox/profiles.py | new (Codex facts from benchkit/adapters.py L12, L96-99, L177-184, L265-267 and runtime.py L69-73) | | |
+| worker_sandbox/hostconfig.py | new | | |
 | Makefile | Makefile | 1-9 | none |
 | requirements-dev.txt | requirements-dev.txt | 1-2 | none |
 | .gitignore | .gitignore | 1-13 | added /verification/, /runs/, /sandbox-runs/ |
@@ -64,6 +66,15 @@ Verbatim import commit in this repository: 5ddf473.
 - step 6: verify_model L233-234, L243: takes (binary: str, binary_digest: str | None); Path(model.binary) -> Path(binary); the digest comparison runs only when binary_digest is not None
 - step 6: claim L252: 'food-delivery is leased by another run; ...' -> f'{self.spec.account} is leased by another run; ...'
 - step 6: start_run L385, _job L535 and L537: homes/swe -> home
+- step 7: added `from .profiles import AgentProfile`
+- step 7: deleted L24 `from .credentials import ...` (last users in seed_native_state replaced in this step)
+- step 7: deleted native_home (L69-73) with its two trailing blank lines: replaced by AgentProfile.home_environment
+- step 7: __init__ signature -> (spec, run, agent: AgentProfile, *, authentication=True, home_dir: Path | None = None, path_prefix: str | None = None), wrapped over two lines
+- step 7: __init__ L127: self.profile = ... -> self.agent = agent and self.home_dir = Path(home_dir) if home_dir is not None else None
+- step 7: seed_native_state (L282-298): body and docstring replaced with the section 6.7 text verbatim; name kept
+- step 7: _job L539-540: environment from control_environment, agent.home_environment, agent.environment and TMPDIR; PATH prefixed only when path_prefix is set
+- step 7: _job: inserted the credential_env passthrough after the environment is built, before `job = {...}`
+- step 7: deleted exactly the imports the architecture check named as unused: threading (L16), uuid (L18), reference_file and safe_open (L22)
 
 ## worker_files.py
 - step 4: service_directories (L487): ('jobs', 'payment') -> ('jobs',)

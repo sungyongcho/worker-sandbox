@@ -13,15 +13,13 @@ import re
 import stat
 import subprocess
 import tempfile
-import threading
 import time
-import uuid
 
 from . import worker_files, worker_job, worker_service, seed
-from .artifacts import atomic_output, atomic_write, reference_file, replace_directory, safe_open, safe_read, tree_manifest
+from .artifacts import atomic_output, atomic_write, replace_directory, safe_read, tree_manifest
 from .contracts import ArtifactRef, ContractError, Halt, Interval, RuntimeRequest, RuntimeResult, RuntimeSpec, digest, dumps, loads, make, validate
-from .credentials import AUTH_FILE, AccountMismatch, CredentialVault, MalformedCredentials, identity, LIMIT, normalize
 from .ownership import exclusive
+from .profiles import AgentProfile
 
 _UNIT = re.compile(r'bk-[0-9a-f]{32}')
 
@@ -63,13 +61,6 @@ def external_nameservers():
     return usable
 
 
-def native_home(home: str) -> dict[str, str]:
-    """Point every native state location into one private HOME."""
-    return {'HOME': home, 'CODEX_HOME': home + '/.codex',
-            'XDG_CONFIG_HOME': home + '/.config', 'XDG_DATA_HOME': home + '/.local/share',
-            'XDG_CACHE_HOME': home + '/.cache', 'XDG_STATE_HOME': home + '/.local/state'}
-
-
 def checked_command(argv: list[str], *, data=None, timeout=30) -> bytes:
     completed = subprocess.run(argv, input=data, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                env=control_environment(), timeout=timeout, check=False)
@@ -81,7 +72,8 @@ def checked_command(argv: list[str], *, data=None, timeout=30) -> bytes:
 
 class NativeRuntime:
     """Owns the worker filesystem and systemd units; never reads or writes run DBs."""
-    def __init__(self, spec: RuntimeSpec, run: Path, *, authentication=True, profile=(), path_prefix: str | None = None):
+    def __init__(self, spec: RuntimeSpec, run: Path, agent: AgentProfile, *, authentication=True, home_dir: Path | None = None,
+                 path_prefix: str | None = None):
         self.spec = validate(spec, RuntimeSpec)
         self.run = Path(run).absolute()
         if not re.fullmatch('[0-9a-f]{32}', self.run.name):
@@ -93,7 +85,8 @@ class NativeRuntime:
         self.starts = 0
         self.service_active = False
         self.authentication = authentication
-        self.profile = tuple(validate(ref, ArtifactRef) for ref in profile)
+        self.agent = agent
+        self.home_dir = Path(home_dir) if home_dir is not None else None
         self.spec_path_prefix = path_prefix
 
     def bind_units(self, identity):
@@ -228,22 +221,19 @@ class NativeRuntime:
         self.rpc('check')
 
     def seed_native_state(self):
-        """Inject only the selected credentials, and a CUSTOM cell's frozen profile, into the implementer HOME."""
-        home = 'homes/swe/.codex/'
-        for ref in self.profile:
-            data = safe_read(self.run / 'profile' / ref.path, self.run / 'profile')
-            if (digest(data), len(data)) != (ref.digest, ref.size):
-                raise ContractError('run implementer profile differs from its frozen identity')
-            self.put(home + ref.path, data, executable=ref.executable)
-        if self.profile:
-            seeded = self.rpc('file_refs', paths=[home + ref.path for ref in self.profile])
-            if [(row['digest'], row['size'], row['executable']) for row in seeded] != [
-                    (ref.digest, ref.size, ref.executable) for ref in self.profile]:
-                raise ContractError('seeded implementer profile differs from its frozen identity')
-        raw = CredentialVault(self.control).load()
-        if raw is not None:
-            self.remember(raw)
-            self.put('homes/swe/' + AUTH_FILE, raw)
+        """Seed the agent HOME with the staged login files and the optional home directory."""
+        if self.home_dir is not None:
+            for ref in tree_manifest(self.home_dir, exclude_generated=False):
+                if ref.kind != 'file':
+                    raise ContractError('home directory may contain regular files only')
+                self.put('home/' + ref.path, safe_read(self.home_dir / ref.path, self.home_dir),
+                         executable=ref.executable)
+        staged = Path(self.control) / 'credentials' / self.agent.name
+        for relative in self.agent.credential_files:
+            source = staged / relative
+            if not os.path.lexists(source):
+                continue
+            self.put('home/' + relative, safe_read(source, staged))
 
     def worker_path(self, relative: str) -> str:
         return str(self.remote / relative)
@@ -376,8 +366,13 @@ class NativeRuntime:
             raise ContractError('native request paths belong to another run or role')
         home = self.worker_path('home')
         workspace = self.worker_path('workspace')
-        environment = {**control_environment(), 'PATH': '/opt/benchkit-python/bin:/usr/local/bin:/usr/bin:/bin',
-                       **native_home(home), 'TMPDIR': self.worker_path('tmp')}
+        environment = {**control_environment(), **self.agent.home_environment(home),
+                       **self.agent.environment, 'TMPDIR': self.worker_path('tmp')}
+        if self.spec_path_prefix:
+            environment['PATH'] = self.spec_path_prefix + ':' + environment['PATH']
+        for name in self.agent.credential_env:
+            if name in os.environ:
+                environment[name] = os.environ[name]
         job = {'argv': request.argv, 'workspace': workspace, 'environment': environment,
                'host_mount_namespace': os.readlink('/proc/self/ns/mnt'),
                'protected_paths': [str(Path.home()), str(self.control), str(self.run), '/run/user'],
