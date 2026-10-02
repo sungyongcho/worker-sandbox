@@ -8,11 +8,11 @@ Import commit: 5ddf473
 ## State
 - Current step: 10 Doctor
 - Status: in progress
-- Last commit: this commit feat: add the host doctor from verify_host
+- Last commit: 700f26d feat: add the host doctor from verify_host
 - Working tree: clean
-- Offline suite: 100 passed at this commit; verify_package passed: verification/package-20261002T082846Z.json
-- Next action: owner runs sudo -v and the doctor command (profile claude, --binary the root-owned copy) and reports the report path; read it and judge it against section 11.3
-- Blocked on: owner: live doctor run (this shell has no sudo)
+- Offline suite: 100 passed at 700f26d; verify_package passed: verification/package-20261002T082846Z.json
+- Next action: owner runs sudo -v and the doctor in a real terminal outside the agent shell, then reports the report path; read it and judge it against section 11.3
+- Blocked on: owner: doctor attempt 1 (verification/doctor-20261002T082941Z.json) ran in the agent shell and stopped at the first sudo -n ("interactive authentication is required"; section 12.1 stop point); no lease, no bk-* unit; rerun from a terminal that has run sudo -v
 
 ## Step log
 | Step | Status | Commit | Note |
@@ -26,7 +26,7 @@ Import commit: 5ddf473
 | 7 Profiles and host config | done | 934adfa | |
 | 8 Tests | done | c92e17f | 6.12 verify_package edits included | |
 | 9 CLI | done | b43a79e | setup_host 6.10 and tests 877, 902 included | |
-| 10 Doctor | in progress | | owner runs live commands; this shell has no sudo |
+| 10 Doctor | blocked | 700f26d | attempt 1 refused by sudo -n in the agent shell; rerun in the owner terminal |
 | 11 Live acceptance | pending | | owner present |
 | 12 README | pending | | |
 | 13 Provenance final pass | pending | | |
