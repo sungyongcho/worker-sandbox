@@ -14,7 +14,7 @@ Verbatim import commit in this repository: 5ddf473.
 | worker_sandbox/seed.py | benchkit/seed.py | 1-26 | none yet |
 | worker_sandbox/contracts.py | benchkit/contracts.py | 1-4, 6-11, 13-15, 17-18, 31, 35-48, 60-63, 68-91, 256-266, 505-576, 580-592 | see "contracts.py" below |
 | tools/setup_host.py | tools/setup_host.py | 1-59 | see "setup_host.py" below |
-| tools/doctor.py | tools/verify_host.py | 1-263 | none yet |
+| tools/doctor.py | tools/verify_host.py | 1-263 | see "doctor.py" below |
 | tools/verify_package.py | tools/verify_package.py | 1-136 | see "verify_package.py" below |
 | tests/test_runtime.py | tests/test_runtime.py | 1-1192 | see "test_runtime.py" below |
 | tests/test_bulk_transfer.py | tests/test_bulk_transfer.py | 1-256 | see "test_bulk_transfer.py" below |
@@ -143,3 +143,18 @@ Verbatim import commit in this repository: 5ddf473.
 - step 9: prepare(controller) -> prepare(controller, account=ACCOUNT, worker=WORKER, control=CONTROL); every use of the constants inside prepare uses the parameters; the local `worker` (the account entry) renamed `worker_account` because `worker` is now the root parameter
 - step 9: added `import json`, host_document and write_host: host.json in the canonical bytes of contracts.dumps(RuntimeSpec), O_EXCL 0600, owned by the controller (see HANDOFF_QUESTIONS)
 - step 9: main gains --account, --worker-root, --control-root and --python, then calls write_host after prepare. The useradd argv and every refusal are unchanged
+
+## doctor.py
+- step 10: imports benchkit -> worker_sandbox; deleted the campaign, providers and urlsplit imports; added hashlib, hostconfig, profiles and `import worker_sandbox.runtime`
+- step 10: added controller_digest(): sha256 of the imported runtime.py bytes, replacing campaign.controller_digest
+- step 10: verify(report_path, timeout) -> verify(report_path, timeout, profile=None, *, check_binary=False); profile defaults to generic
+- step 10: NativeRuntime(c.RuntimeSpec(), folder, authentication=False) -> NativeRuntime(spec, folder, profile, authentication=False) with spec from hostconfig.read(); the second NativeRuntime in the residue check also takes the profile (signature change)
+- step 10: report gains 'profile'
+- step 10: invoke(): home homes/swe -> home
+- step 10: deleted the controller Jev endpoint check (L58-63)
+- step 10: deleted the stopped-native-archive-fixture job and fixture_files (L65-81)
+- step 10: setup-resolver-and-provider-https: host tuple -> profile.hosts, substituted into the probe source like PATHS
+- step 10: deleted the native-archive-bytes-and-exclusions block in finally (L219-233); collect_workspace kept
+- step 10: added checks agent-binary-root-owned (verify_model(profile.binary, None); skipped without --binary) and managed-settings-present (informational) after the existing checks
+- step 10: literals: temporary prefix benchkit-host-check- -> worker-sandbox-host-check-; private-grader-canary -> private-controller-canary; benchkit-write-probe -> worker-sandbox-write-probe; module docstring no longer names Codex-only endpoints or Jev
+- step 10: main gains --profile and --binary

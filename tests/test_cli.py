@@ -226,6 +226,17 @@ class RecoverTests(unittest.TestCase):
         self.assertEqual((result['units_stopped'], result['account_quiet']), (True, True))
 
 
+class DoctorTests(unittest.TestCase):
+    def test_doctor_imports_and_never_overwrites_a_report(self):
+        spec = importlib.util.spec_from_file_location('doctor_under_test', SETUP_HOST.parent / 'doctor.py')
+        doctor = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(doctor)
+        with tempfile.NamedTemporaryFile() as existing, patch.object(doctor, 'NativeRuntime') as runtime, \
+             self.assertRaises(FileExistsError):
+            doctor.verify(Path(existing.name), 120, cli.profiles.claude('/opt/claude'), check_binary=True)
+        runtime.assert_not_called()
+
+
 class HostConfigTests(unittest.TestCase):
     def test_setup_host_writes_the_bytes_hostconfig_reads(self):
         setup_host = setup_host_module()

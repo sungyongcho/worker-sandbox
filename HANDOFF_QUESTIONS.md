@@ -150,3 +150,12 @@ Did instead: result.json carries the preflight RuntimeResult with outcome set to
   `--version` printed 2.1.286 from an empty HOME).
 - Live steps 10 and 11: this session has no sudo. The agent commits code and gives one exact command per line; the
   owner runs it after `sudo -v` and reports the report path; the agent reads and judges it, then gives the next command.
+
+## 2026-10-02 tools/doctor.py:1
+Expected: 6.11 lists the doctor edits; "Everything else stays".
+Observed: after the listed deletions, the module docstring still described the Jev endpoint, the probe names still
+contained `grader` and `benchkit` (the Appendix A grep flags both), and the residue check builds a second NativeRuntime
+whose signature now requires a profile.
+Did instead: rewrote the two docstring sentences, renamed the three literals (private-controller-canary,
+worker-sandbox-write-probe, worker-sandbox-host-check-) and passed the profile to the second NativeRuntime.
+Every check, its order and its pass criterion are unchanged. tests/test_cli.py DoctorTests imports the module offline.

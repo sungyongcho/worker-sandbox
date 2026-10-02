@@ -1,12 +1,13 @@
-"""Model-free host check for the Codex/OpenAI implementer boundary and the controller's Jev endpoint.
+"""Model-free host check for the worker sandbox boundary.
 
-Explicit invocation creates one synthetic execution space. It checks the Codex/OpenAI
-endpoints from the worker namespaces and the TypeSafe Jev endpoint from the controller.
+Explicit invocation creates one synthetic execution space. It checks the selected agent
+profile's provider endpoints from the worker namespaces.
 No models, credentials, automatic recovery, or replacement verification runs are used.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -15,25 +16,29 @@ import sys
 import tempfile
 import threading
 import time
-from urllib.parse import urlsplit
 import uuid
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from benchkit import contracts as c
-from benchkit.campaign import controller_digest
-from benchkit.providers import JEV_ENDPOINT
-from benchkit.runtime import NativeRuntime, checked_command
-from benchkit.seed import seed_repository
+from worker_sandbox import contracts as c, hostconfig, profiles
+import worker_sandbox.runtime
+from worker_sandbox.runtime import NativeRuntime, checked_command
+from worker_sandbox.seed import seed_repository
 
 
-def verify(report_path, timeout):
+def controller_digest():
+    """The sha256 of the runtime.py this doctor imports; recorded, never a gate."""
+    return 'sha256:' + hashlib.sha256(Path(worker_sandbox.runtime.__file__).read_bytes()).hexdigest()
+
+
+def verify(report_path, timeout, profile=None, *, check_binary=False):
+    profile = profiles.generic('') if profile is None else profile
     if type(timeout) is not int or timeout <= 0:
         raise ValueError('Host diagnostic timeout must be a positive integer')
     if report_path.exists():
         raise FileExistsError('Choose a new report path; historical evidence is immutable')
     if not Path('/usr/bin/slirp4netns').is_file():
         raise RuntimeError('Missing prerequisite: /usr/bin/slirp4netns')
-    root = Path(tempfile.mkdtemp(prefix='benchkit-host-check-'))
+    root = Path(tempfile.mkdtemp(prefix='worker-sandbox-host-check-'))
     root.chmod(0o700)
     folder = root / 'runs' / uuid.uuid4().hex
     (folder / 'workspace').mkdir(parents=True)
@@ -41,13 +46,15 @@ def verify(report_path, timeout):
         (folder / name).mkdir()
     seed_repository(folder / 'workspace')
     # The diagnostic executes Python probes only, never a native executable or login.
-    runtime = NativeRuntime(c.RuntimeSpec(), folder, authentication=False)
-    report = {'status': 'failed', 'model_calls': 0, 'run': str(folder), 'controller_digest': controller_digest(), 'checks': []}
+    spec = hostconfig.read()
+    runtime = NativeRuntime(spec, folder, profile, authentication=False)
+    report = {'status': 'failed', 'model_calls': 0, 'run': str(folder), 'controller_digest': controller_digest(),
+              'profile': profile.name, 'checks': []}
     deadline = time.monotonic() + timeout
     def invoke(label, source):
         name = 'bk-' + uuid.uuid4().hex
         request = c.make(c.RuntimeRequest, spec=runtime.spec, name=name,
-            workspace=str(folder / 'workspace'), home=str(folder / 'homes/swe'),
+            workspace=str(folder / 'workspace'), home=str(folder / 'home'),
             argv=('/usr/bin/python3', '-I', '-c', source), log_dir=str(folder / 'raw' / name))
         result = runtime.invoke(request, cancel=lambda: time.monotonic() >= deadline)
         report['checks'].append({'name': label, 'result': json.loads(c.dumps(result))})
@@ -55,44 +62,21 @@ def verify(report_path, timeout):
             raise RuntimeError(label + ': ' + str(result.error or result.outcome))
         return result
     try:
-        # Jev is called by the controller, never from the worker; check DNS and the TLS port only.
-        host = urlsplit(JEV_ENDPOINT).hostname
-        addresses = sorted({row[4][0] for row in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)})
-        socket.create_connection((host, 443), timeout=10).close()
-        report['checks'].append({'name': 'controller-jev-endpoint-dns-and-tls-port', 'host': host,
-                                 'addresses': addresses, 'passed': True})
         runtime.claim()
-        native_fixture = invoke('stopped-native-archive-fixture', """from pathlib import Path
-import hashlib,json,os,sys
-root=Path.cwd().parent
-home=root/'homes/swe/.codex'
-(home/'sessions/2026').mkdir(parents=True)
-(home/'log').mkdir(parents=True)
-(home/'sessions/2026/rollout-synthetic.jsonl').write_bytes(b'{"synthetic_fixture":true}\\n')
-(home/'log/codex-tui.log').write_bytes(b'synthetic native startup evidence\\n')
-paths=[home/'sessions/2026/rollout-synthetic.jsonl',home/'log/codex-tui.log']
-rows=[{'path':str(path.relative_to(root)),'digest':'sha256:'+hashlib.sha256(path.read_bytes()).hexdigest(),'size':path.stat().st_size} for path in paths]
-excluded=['homes/swe/.codex/auth.json','homes/swe/.cache/codex/cache']
-for relative in excluded:
- path=root/relative;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'synthetic excluded state')
-print(json.dumps({'files':rows,'excluded':excluded}),flush=True)
-os._exit(0)
-""")
-        fixture_files = json.loads(Path(native_fixture.stdout_path).read_bytes())
         invoke('setup-resolver-and-provider-https', """from pathlib import Path
 import json,socket,urllib.request,urllib.error
 report={'resolver':Path('/etc/resolv.conf').read_text(),'endpoints':[]}
-for host in ('chatgpt.com','auth.openai.com','api.openai.com'):
+for host in HOSTS:
  addresses=sorted({row[4][0] for row in socket.getaddrinfo(host,443,type=socket.SOCK_STREAM)})
  try:
   with urllib.request.urlopen('https://'+host+'/',timeout=10) as response: status=response.status
  except urllib.error.HTTPError as response: status=response.code
  report['endpoints'].append({'host':host,'addresses':addresses,'http_status':status})
 print(json.dumps(report))
-""")
+""".replace('HOSTS', repr(tuple(profile.hosts))))
         runtime.start_run()
-        private = folder / 'private-grader-canary'
-        private.write_text('private grader fixture')
+        private = folder / 'private-controller-canary'
+        private.write_text('private controller fixture')
         paths = [str(private), str(runtime.control), str(Path.home()), '/run/user']
         probe = """import os
 from pathlib import Path
@@ -105,7 +89,7 @@ for path in paths:
  except (PermissionError,FileNotFoundError): pass
  else:
   os.close(fd); raise AssertionError(('read succeeded',path))
- target=path if path.endswith('private-grader-canary') else path+'/benchkit-write-probe'
+ target=path if path.endswith('private-controller-canary') else path+'/worker-sandbox-write-probe'
  try:
   fd=os.open(target, os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
  except (PermissionError,FileNotFoundError,OSError) as exc:
@@ -181,6 +165,14 @@ print('existing same-UID foreign session read/write denied')
             source = "import socket\nfor host in " + repr(sorted(hosts)) + ":\n with socket.socket() as s:\n  s.settimeout(.5)\n  assert s.connect_ex((host," + str(port) + ")) != 0, ('host service reachable',host)\n"
             invoke('host-network-services-denied', source)
         invoke('internet-tls-port', "import socket; s=socket.create_connection(('api.openai.com',443),timeout=10); s.close()")
+        if check_binary:
+            identity = NativeRuntime.verify_model(profile.binary, None)
+            report['checks'].append({'name': 'agent-binary-root-owned', 'binary': profile.binary, 'digest': identity, 'passed': True})
+        else:
+            report['checks'].append({'name': 'agent-binary-root-owned', 'skipped': 'no --binary given', 'passed': True})
+        # Informational: managed agent policy on this host is recorded, never required.
+        managed = {path: os.path.exists(path) for path in ('/etc/claude-code/managed-settings.json', '/etc/codex')}
+        report['checks'].append({'name': 'managed-settings-present', 'present': managed, 'passed': True})
         report['status'] = 'passed'
     except Exception as exc:
         report['error'] = f'{type(exc).__name__}: {exc}'
@@ -191,7 +183,7 @@ print('existing same-UID foreign session read/write denied')
             if not stopped:
                 raise RuntimeError('Stop uncertain; execution space and lease retained')
             if report['status'] == 'passed':
-                other = NativeRuntime(runtime.spec, root / 'runs' / uuid.uuid4().hex, authentication=False)
+                other = NativeRuntime(runtime.spec, root / 'runs' / uuid.uuid4().hex, profile, authentication=False)
                 (other.run / 'workspace').mkdir(parents=True)
                 try:
                     other.claim()
@@ -216,21 +208,6 @@ print('existing same-UID foreign session read/write denied')
                 remover = "from pathlib import Path; import sys; p=Path(sys.argv[1]); assert set(x.name for x in p.iterdir())=={'marker'} and (p/'marker').read_text()==p.name; (p/'marker').unlink(); p.rmdir()"
                 checked_command([*command, remover, str(sibling)])
             runtime.collect_workspace()
-            archive = runtime.collect_native_evidence()
-            report['archive'] = json.loads(c.dumps(archive))
-            if report['status'] == 'passed':
-                archived = {ref.path: ref for ref in archive}
-                for row in fixture_files['files']:
-                    ref = archived['archive/' + row['path']]
-                    if (ref.digest, ref.size) != (row['digest'], row['size']):
-                        raise RuntimeError('Native archive differs from stopped fixture: ' + row['path'])
-                    observed = runtime.rpc('file_identity', path=row['path'])
-                    if (observed['digest'], observed['size']) != (ref.digest, ref.size):
-                        raise RuntimeError('Native fixture changed during collection: ' + row['path'])
-                if any('archive/' + path in archived for path in fixture_files['excluded']):
-                    raise RuntimeError('Native archive included credentials or cache')
-                report['checks'].append({'name': 'native-archive-bytes-and-exclusions', 'passed': True,
-                                         'files': fixture_files['files'], 'excluded': fixture_files['excluded']})
             if report['status'] == 'passed':
                 runtime.release()
                 if not runtime.rpc('empty'):
@@ -249,9 +226,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--report', type=Path, required=True)
     parser.add_argument('--timeout', type=int, default=120, help='Diagnostic observer timeout; not an experiment limit')
+    parser.add_argument('--profile', choices=('claude', 'codex', 'generic'), default='generic')
+    parser.add_argument('--binary')
     args = parser.parse_args()
     try:
-        report = verify(args.report, args.timeout)
+        binary = str(Path(args.binary).absolute()) if args.binary else ''
+        profile = {'claude': profiles.claude, 'codex': profiles.codex, 'generic': profiles.generic}[args.profile](binary)
+        report = verify(args.report, args.timeout, profile, check_binary=args.binary is not None)
     except (OSError, RuntimeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 2

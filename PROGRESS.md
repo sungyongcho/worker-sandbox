@@ -8,11 +8,11 @@ Import commit: 5ddf473
 ## State
 - Current step: 10 Doctor
 - Status: in progress
-- Last commit: dce7431 docs(progress): record the stop for host provisioning before step 10
+- Last commit: this commit feat: add the host doctor from verify_host
 - Working tree: clean
-- Offline suite: 99 passed at b43a79e; verify_package passed: verification/package-20261002T070822Z.json
-- Next action: apply section 6.11 to tools/doctor.py (verify(report_path, timeout, profile, *, check_binary)), run the suite, commit, then hand the owner the exact doctor command
-- Blocked on: none
+- Offline suite: 100 passed at this commit; verify_package passed: verification/package-20261002T082846Z.json
+- Next action: owner runs sudo -v and the doctor command (profile claude, --binary the root-owned copy) and reports the report path; read it and judge it against section 11.3
+- Blocked on: owner: live doctor run (this shell has no sudo)
 
 ## Step log
 | Step | Status | Commit | Note |
