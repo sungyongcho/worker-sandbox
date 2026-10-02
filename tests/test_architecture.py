@@ -5,7 +5,7 @@ import ast
 from pathlib import Path
 import unittest
 
-ROOT = Path(__file__).resolve().parents[1] / "benchkit"
+ROOT = Path(__file__).resolve().parents[1] / "worker_sandbox"
 MODULES = tuple(path.stem for path in sorted(ROOT.glob("*.py")))
 
 
@@ -18,12 +18,12 @@ def imported_dependencies(node):
     if isinstance(node, ast.ImportFrom):
         if node.level:
             return [node.module.split(".")[0]] if node.module else [item.name for item in node.names]
-        if node.module and node.module.startswith("benchkit."):
+        if node.module and node.module.startswith("worker_sandbox."):
             return [node.module.split(".")[1]]
-        if node.module == "benchkit":
+        if node.module == "worker_sandbox":
             return [item.name for item in node.names]
     if isinstance(node, ast.Import):
-        return [item.name.split(".")[1] for item in node.names if item.name.startswith("benchkit.")]
+        return [item.name.split(".")[1] for item in node.names if item.name.startswith("worker_sandbox.")]
     return []
 
 

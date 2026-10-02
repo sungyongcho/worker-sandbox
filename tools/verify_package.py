@@ -22,18 +22,18 @@ from importlib import import_module, metadata
 import json
 from pathlib import Path
 import sys
-import benchkit
+import worker_sandbox
 
 source = Path(sys.argv[1])
-package = Path(benchkit.__file__).resolve().parent
+package = Path(worker_sandbox.__file__).resolve().parent
 assert package.is_relative_to(Path(sys.prefix).resolve()), "source checkout shadowed the installed package"
-modules = sorted(path.stem for path in (source / "benchkit").glob("*.py"))
+modules = sorted(path.stem for path in (source / "worker_sandbox").glob("*.py"))
 assert sorted(path.stem for path in package.glob("*.py")) == modules
 for name in modules:
-    module = import_module("benchkit" if name == "__init__" else "benchkit." + name)
-    assert Path(module.__file__).read_bytes() == (source / "benchkit" / (name + ".py")).read_bytes(), name
-print(json.dumps({"version": metadata.version("worker-benchmark-kit"), "modules": len(modules),
-                  "requires": metadata.requires("worker-benchmark-kit")}))
+    module = import_module("worker_sandbox" if name == "__init__" else "worker_sandbox." + name)
+    assert Path(module.__file__).read_bytes() == (source / "worker_sandbox" / (name + ".py")).read_bytes(), name
+print(json.dumps({"version": metadata.version("worker-sandbox"), "modules": len(modules),
+                  "requires": metadata.requires("worker-sandbox")}))
 '''
 
 OFFLINE_TESTS = r'''
@@ -41,17 +41,17 @@ import json
 from pathlib import Path
 import sys
 import unittest
-import benchkit
+import worker_sandbox
 
 test_root, temporary = Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve()
-assert Path(benchkit.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
+assert Path(worker_sandbox.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
 
 def offline_guard(event, arguments):
     if event in {"socket.connect", "socket.getaddrinfo"}:
         raise RuntimeError("network access is forbidden in offline package tests")
     if event == "subprocess.Popen":
         executable = Path(arguments[0]).absolute()
-        if executable.name in {"sudo", "systemctl", "systemd-run", "codex"} and not executable.is_relative_to(temporary):
+        if executable.name in {"sudo", "systemctl", "systemd-run", "codex", "claude"} and not executable.is_relative_to(temporary):
             raise RuntimeError("live privileged/provider executable is forbidden in offline package tests")
 
 sys.addaudithook(offline_guard)
@@ -69,10 +69,10 @@ def verify(report_path: Path) -> dict:
     facts, commands = {}, []
     environment = {key: value for key, value in os.environ.items()
                    if key not in {"PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE", "VIRTUAL_ENV", "PIP_TARGET",
-                                  "PIP_PREFIX", "PIP_USER", "JEV_API_KEY", "OPENAI_API_KEY"}}
+                                  "PIP_PREFIX", "PIP_USER", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"}}
     environment.update(PYTHONDONTWRITEBYTECODE="1", PYTHONNOUSERSITE="1", PIP_DISABLE_PIP_VERSION_CHECK="1",
                        PIP_NO_INPUT="1", SOURCE_DATE_EPOCH="946684800")
-    with tempfile.TemporaryDirectory(prefix="benchkit-verification-") as name:
+    with tempfile.TemporaryDirectory(prefix="worker-sandbox-verification-") as name:
         temporary = Path(name)
         empty, fresh, scratch = temporary / "empty", temporary / "environment", temporary / "tmp"
         empty.mkdir()

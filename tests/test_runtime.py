@@ -16,12 +16,11 @@ from types import SimpleNamespace
 
 import msgspec
 
-from benchkit import contracts as c, worker_files, worker_job, worker_service
-from benchkit.artifacts import tree_manifest
-from benchkit.credentials import AUTH_FILE, AccountMismatch, CredentialVault, MalformedCredentials
-from benchkit.adapters import EVIDENCE_DIRECTORIES
-from benchkit.runtime import NETWORK_BROKER, NativeRuntime, native_login
-from fixtures import CELLS, WORKER, codex_auth
+from worker_sandbox import contracts as c, worker_files, worker_job, worker_service
+from worker_sandbox.artifacts import tree_manifest
+from worker_sandbox.profiles import claude, codex, generic
+from worker_sandbox.runtime import NETWORK_BROKER, NativeRuntime
+from fixtures import codex_auth
 
 
 def recorder_script():
@@ -63,36 +62,6 @@ class WorkerFilesTests(unittest.TestCase):
             worker_files.put_file(self.root, 'workspace/a', b'second', False)
         self.assertEqual(worker_files.read_file(self.root, 'workspace/a', 20), b'first')
 
-    def test_reset_keeps_only_one_real_top_level_directory(self):
-        other = tempfile.TemporaryDirectory()
-        self.addCleanup(other.cleanup)
-        outside = Path(other.name)
-        (outside / 'kept').write_bytes(b'outside')
-        (self.root / 'grade-env/bin').mkdir(parents=True)
-        (self.root / 'grade-env/bin/python').write_bytes(b'environment')
-        for relative in ('homes/swe/.cache/state', 'tmp/state', 'workspace/app.db', 'application.sqlite3'):
-            (self.root / relative).parent.mkdir(parents=True, exist_ok=True)
-            (self.root / relative).write_bytes(b'previous case')
-        (self.root / 'link').symlink_to(outside, target_is_directory=True)
-        os.mkfifo(self.root / 'fifo')
-        self.root.chmod(0o755)
-        worker_files.dispatch(self.root, {'action': 'reset', 'keep': 'grade-env'})
-        self.assertEqual(sorted(path.name for path in self.root.iterdir()), ['grade-env', 'homes', 'tmp', 'workspace'])
-        self.assertEqual([path.name for path in (self.root / 'homes').iterdir()], ['swe'])
-        for relative in ('homes/swe', 'tmp', 'workspace'):
-            self.assertEqual(list((self.root / relative).iterdir()), [])
-        self.assertEqual((self.root / 'grade-env/bin/python').read_bytes(), b'environment')
-        self.assertEqual(self.root.stat().st_mode & 0o777, 0o700)
-        self.assertTrue(worker_files.dispatch(self.root, {'action': 'check'}))
-        # A link in place of the kept directory is removed, never followed.
-        worker_files.dispatch(self.root, {'action': 'reset', 'keep': None})
-        (self.root / 'grade-env').symlink_to(outside, target_is_directory=True)
-        worker_files.dispatch(self.root, {'action': 'reset', 'keep': 'grade-env'})
-        self.assertFalse(os.path.lexists(self.root / 'grade-env'))
-        self.assertEqual((outside / 'kept').read_bytes(), b'outside')
-        with self.assertRaises(ValueError):
-            worker_files.dispatch(self.root, {'action': 'reset', 'keep': 'homes/swe'})
-
     def test_bridge_runs_without_controller_dependency(self):
         result = subprocess.run([sys.executable, '-I', '-c', Path(worker_files.__file__).read_text(), str(self.root)],
                                 input=b'{"action":"list","path":"workspace","exclude":false}',
@@ -102,26 +71,10 @@ class WorkerFilesTests(unittest.TestCase):
     def test_file_listing_never_exposes_a_native_home(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            (root / 'homes/swe/.codex').mkdir(parents=True)
-            (root / 'homes/swe/.codex/auth.json').write_bytes(b'{}')
+            (root / 'home/.codex').mkdir(parents=True)
+            (root / 'home/.codex/auth.json').write_bytes(b'{}')
             with self.assertRaisesRegex(ValueError, 'invalid tree'):
-                worker_files.dispatch(root, {'action': 'list', 'path': 'homes/swe', 'exclude': False})
-
-    def test_native_archive_rejects_linked_evidence_directories(self):
-        home = 'homes/swe/.codex'
-        for kind in ('parent-link', 'log-link'):
-            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as folder:
-                root = Path(folder)
-                (root / home / 'sessions').mkdir(parents=True)
-                if kind == 'parent-link':
-                    (root / home / 'sessions').rmdir()
-                    (root / home).rmdir()
-                    (root / home).symlink_to(root / 'missing', target_is_directory=True)
-                else:
-                    (root / home / 'log').symlink_to(root / 'missing', target_is_directory=True)
-                with self.assertRaises((ValueError, OSError)):
-                    worker_files.dispatch(root, {'action': 'native_evidence',
-                        'directories': ['homes/swe/' + name for name in EVIDENCE_DIRECTORIES]})
+                worker_files.dispatch(root, {'action': 'list', 'path': 'home', 'exclude': False})
 
 
 class WorkerJobTests(unittest.TestCase):
@@ -140,18 +93,18 @@ class WorkerJobTests(unittest.TestCase):
 
     def test_isolation_guard_checks_readonly_mounts_paths_and_privileges(self):
         job = {'host_mount_namespace': 'host', 'protected_paths': ['/private']}
-        with patch('benchkit.worker_job.os.readlink', return_value='worker'), \
-             patch('benchkit.worker_job.os.statvfs', return_value=SimpleNamespace(f_flag=os.ST_RDONLY)), \
-             patch('benchkit.worker_job.os.access', return_value=False), \
-             patch('benchkit.worker_job.Path.read_text', return_value='NoNewPrivs:\t1\nCapEff:\t0000\n'):
+        with patch('worker_sandbox.worker_job.os.readlink', return_value='worker'), \
+             patch('worker_sandbox.worker_job.os.statvfs', return_value=SimpleNamespace(f_flag=os.ST_RDONLY)), \
+             patch('worker_sandbox.worker_job.os.access', return_value=False), \
+             patch('worker_sandbox.worker_job.Path.read_text', return_value='NoNewPrivs:\t1\nCapEff:\t0000\n'):
             worker_job.verify_isolation(job)
-            with patch('benchkit.worker_job.os.statvfs', return_value=SimpleNamespace(f_flag=0)), \
+            with patch('worker_sandbox.worker_job.os.statvfs', return_value=SimpleNamespace(f_flag=0)), \
                  self.assertRaisesRegex(RuntimeError, 'read-only'):
                 worker_job.verify_isolation(job)
-            with patch('benchkit.worker_job.os.access', return_value=True), \
+            with patch('worker_sandbox.worker_job.os.access', return_value=True), \
                  self.assertRaisesRegex(RuntimeError, 'protected controller'):
                 worker_job.verify_isolation(job)
-            with patch('benchkit.worker_job.Path.read_text', return_value='NoNewPrivs:\t0\nCapEff:\t0000\n'), \
+            with patch('worker_sandbox.worker_job.Path.read_text', return_value='NoNewPrivs:\t0\nCapEff:\t0000\n'), \
                  self.assertRaisesRegex(RuntimeError, 'privileges'):
                 worker_job.verify_isolation(job)
 
@@ -203,11 +156,6 @@ class WorkerJobTests(unittest.TestCase):
         self.assertGreaterEqual(result['wall_sec'], .2)
         self.assertGreaterEqual(result['finished_monotonic'] - result['started_monotonic'], .2)
 
-    def test_supervisor_reports_gateway_exit_instead_of_waiting_forever(self):
-        with tempfile.TemporaryDirectory() as temporary, \
-             patch('benchkit.worker_service.subprocess.Popen', return_value=SimpleNamespace(poll=lambda: 7, returncode=7)), \
-             self.assertRaisesRegex(RuntimeError, 'Payment gateway exited: 7'):
-            worker_service.serve(Path(temporary))
 
 class NativeRuntimeTests(unittest.TestCase):
     def setUp(self):
@@ -215,8 +163,7 @@ class NativeRuntimeTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.run = self.root / ('a' * 32)
         self.run.mkdir(); (self.run / 'workspace').mkdir(); (self.run / 'artifacts').mkdir()
-        self.model = WORKER
-        self.runtime = NativeRuntime(c.RuntimeSpec(), self.run)
+        self.runtime = NativeRuntime(c.RuntimeSpec(), self.run, generic('/usr/bin/native'))
         self.runtime.remote = self.root / 'worker' / self.run.name
         self.runtime.remote.parent.mkdir()
         self.runtime.control = self.root / 'control'; self.runtime.control.mkdir(mode=0o700)
@@ -230,12 +177,12 @@ class NativeRuntimeTests(unittest.TestCase):
 
     def request(self, **fields):
         return c.make(c.RuntimeRequest, spec=self.runtime.spec, name='bk-' + 'b' * 32,
-                      workspace=str(self.run / 'workspace'), home=str(self.run / 'homes/swe'),
+                      workspace=str(self.run / 'workspace'), home=str(self.run / 'home'),
                       argv=('/usr/bin/native',), log_dir=str(self.run / 'raw/job'), **fields)
 
     def claim(self):
         if not (self.runtime.run / 'workspace/.git').exists():
-            from benchkit.seed import seed_repository
+            from worker_sandbox.seed import seed_repository
             seed_repository(self.runtime.run / 'workspace')
         with patch.object(self.runtime, 'inspect'), patch.object(self.runtime, 'confirm_stopped', return_value=True):
             self.runtime.claim()
@@ -243,7 +190,7 @@ class NativeRuntimeTests(unittest.TestCase):
 
     def home_files(self):
         """The implementer HOME's regular files, read directly from the worker tree."""
-        home = self.runtime.remote / 'homes/swe'
+        home = self.runtime.remote / 'home'
         return sorted(path.relative_to(home).as_posix() for path in home.rglob('*') if path.is_file()) if home.exists() else []
 
     def seed(self):
@@ -253,40 +200,38 @@ class NativeRuntimeTests(unittest.TestCase):
         return expected
 
     def test_existing_lease_preserves_native_credentials_without_reseeding(self):
-        CredentialVault(self.runtime.control).replace(codex_auth())
+        self.runtime.agent = codex('/usr/bin/native')
+        (self.runtime.control / 'credentials/codex/.codex').mkdir(parents=True)
+        (self.runtime.control / 'credentials/codex/.codex/auth.json').write_bytes(codex_auth())
         self.claim()
-        path = self.runtime.remote / 'homes/swe' / AUTH_FILE
+        path = self.runtime.remote / 'home/.codex/auth.json'
         self.assertEqual(path.read_bytes(), codex_auth())
         path.write_bytes(codex_auth(token='native-refresh'))
         self.claim()
         self.assertEqual(path.read_bytes(), codex_auth(token='native-refresh'))
 
-    def test_custom_profile_is_seeded_into_codex_home_only_and_verified(self):
-        files = {'config.toml': b'[agents]\nmax_threads = 2\n', 'agents/reviewer.toml': b'model = "fixture"\n'}
+    def test_home_dir_is_seeded_into_codex_home_only_and_verified(self):
+        files = {'.codex/config.toml': b'[agents]\nmax_threads = 2\n', '.codex/agents/reviewer.toml': b'model = "fixture"\n'}
+        home_dir = self.root / 'home-dir'
         for path, data in files.items():
-            (self.run / 'profile' / path).parent.mkdir(parents=True, exist_ok=True)
-            (self.run / 'profile' / path).write_bytes(data)
-        CredentialVault(self.runtime.control).replace(codex_auth())
-        self.runtime.profile = tree_manifest(self.run / 'profile', exclude_generated=False)
+            (home_dir / path).parent.mkdir(parents=True, exist_ok=True)
+            (home_dir / path).write_bytes(data)
+        self.runtime.agent = codex('/usr/bin/native')
+        (self.runtime.control / 'credentials/codex/.codex').mkdir(parents=True)
+        (self.runtime.control / 'credentials/codex/.codex/auth.json').write_bytes(codex_auth())
+        self.runtime.home_dir = home_dir
         expected = self.seed()
         self.runtime.verify_seed(expected)
         self.assertEqual(self.home_files(),
-                         sorted([AUTH_FILE, '.codex/agents/reviewer.toml', '.codex/config.toml']))
+                         sorted(['.codex/auth.json', '.codex/agents/reviewer.toml', '.codex/config.toml']))
         for path, data in files.items():
-            self.assertEqual(self.runtime.read('homes/swe/.codex/' + path), data)
-        self.assertEqual(self.runtime.read('homes/swe/' + AUTH_FILE), codex_auth())
-
-    def test_changed_run_profile_is_refused_before_native_state_is_seeded(self):
-        (self.run / 'profile').mkdir()
-        (self.run / 'profile/config.toml').write_bytes(b'frozen')
-        self.runtime.profile = tree_manifest(self.run / 'profile', exclude_generated=False)
-        (self.run / 'profile/config.toml').write_bytes(b'edited')
-        with self.assertRaisesRegex(c.ContractError, 'profile differs from its frozen identity'):
-            self.claim()
-        self.assertEqual(self.home_files(), [])
+            self.assertEqual(self.runtime.read('home/' + path), data)
+        self.assertEqual(self.runtime.read('home/.codex/auth.json'), codex_auth())
 
     def test_grader_runtime_does_not_seed_native_credentials(self):
-        CredentialVault(self.runtime.control).replace(codex_auth())
+        self.runtime.agent = codex('/usr/bin/native')
+        (self.runtime.control / 'credentials/codex/.codex').mkdir(parents=True)
+        (self.runtime.control / 'credentials/codex/.codex/auth.json').write_bytes(codex_auth())
         self.runtime.authentication = False
         self.claim()
         self.assertEqual(self.home_files(), [])
@@ -310,8 +255,8 @@ class NativeRuntimeTests(unittest.TestCase):
 
         is_file = Path.is_file
         with patch.object(Path, 'is_file', lambda path: path == Path('/usr/bin/slirp4netns') or is_file(path)), \
-             patch('benchkit.runtime.external_nameservers', return_value=['1.1.1.1', '2606:4700:4700::1111']), \
-             patch('benchkit.runtime.checked_command', side_effect=command), \
+             patch('worker_sandbox.runtime.external_nameservers', return_value=['1.1.1.1', '2606:4700:4700::1111']), \
+             patch('worker_sandbox.runtime.checked_command', side_effect=command), \
              patch.object(self.runtime, 'state', return_value={'MainPID': '1234'}):
             self.runtime.start_run()
         broker, = [argv for argv in commands if '/usr/bin/slirp4netns' in argv]
@@ -352,8 +297,8 @@ class NativeRuntimeTests(unittest.TestCase):
         resolver.write_bytes(b'existing evidence')
         is_file = Path.is_file
         with patch.object(Path, 'is_file', lambda path: path == Path('/usr/bin/slirp4netns') or is_file(path)), \
-             patch('benchkit.runtime.external_nameservers', return_value=['1.1.1.1']), \
-             patch('benchkit.runtime.checked_command') as command, \
+             patch('worker_sandbox.runtime.external_nameservers', return_value=['1.1.1.1']), \
+             patch('worker_sandbox.runtime.checked_command') as command, \
              self.assertRaises(FileExistsError):
             self.runtime.start_run()
         command.assert_not_called()
@@ -451,7 +396,7 @@ raise SystemExit(7)
                 request = msgspec.structs.replace(self.request(), name='bk-' + ('c' if code else 'd') * 32,
                                                   log_dir=str(self.run / 'raw' / outcome))
                 with patch.object(self.runtime, '_observe', return_value=observed), \
-                     patch('benchkit.runtime.checked_command', return_value=b''), \
+                     patch('worker_sandbox.runtime.checked_command', return_value=b''), \
                      patch.object(self.runtime, 'cleanup', return_value=True), \
                      patch.object(self.runtime, 'download', side_effect=OSError('disk full')):
                     result = self.runtime.invoke(request)
@@ -474,7 +419,7 @@ raise SystemExit(7)
                     self.runtime.put(relative + '/stderr', b'original native stderr')
                     raise failure
                 with patch.object(self.runtime, '_observe', side_effect=observe), \
-                     patch('benchkit.runtime.checked_command', return_value=b''), \
+                     patch('worker_sandbox.runtime.checked_command', return_value=b''), \
                      patch.object(self.runtime, 'cleanup', return_value=True) as cleanup:
                     result = self.runtime.invoke(request)
                 self.assertEqual(result.outcome, failure.outcome if isinstance(failure, c.Halt) else 'harness_error')
@@ -516,7 +461,7 @@ raise SystemExit(7)
 
     def test_systemd_owns_account_descendants_without_elapsed_time_or_resource_caps(self):
         command = self.runtime.service_command(self.request(), self.runtime.remote / 'jobs')
-        for value in ('User=food-delivery', 'ExitType=cgroup', 'KillMode=control-group', 'RuntimeMaxSec=infinity'):
+        for value in ('User=worker-sandbox', 'ExitType=cgroup', 'KillMode=control-group', 'RuntimeMaxSec=infinity'):
             self.assertIn('--property=' + value, command)
         self.assertFalse(any('CPUQuota' in item or 'MemoryMax' in item for item in command))
         self.assertNotIn('docker', ' '.join(command))
@@ -555,92 +500,6 @@ raise SystemExit(7)
             self.assertEqual(mounts, [f'--property=BindReadOnlyPaths={resolver}:/etc/resolv.conf'])
             self.assertIn('--property=TemporaryFileSystem=/var:ro /run:ro /dev/shm:rw,mode=1777', command)
             self.assertNotIn('--property=PrivateNetwork=yes', command)
-            with patch.object(self.runtime, 'confirm_stopped', return_value=True):
-                archived = self.runtime.collect_native_evidence()
-            ref, = [ref for ref in archived if ref.path == 'archive/' + relative + '/resolv.conf']
-            self.assertEqual((self.run / ref.path).read_bytes(), original)
-            self.assertEqual(ref.digest, c.digest(original))
-
-    def test_native_archive_preserves_native_state_and_excludes_credentials_and_caches(self):
-        self.claim()
-        expected = {
-            'homes/swe/.codex/sessions/2026/rollout.jsonl': b'{"type":"session_meta"}\n',
-            'homes/swe/.codex/log/codex-tui.log': b'native swe log\n',
-            'jobs/setup/stderr': b'original diagnostic',
-        }
-        for relative, raw in expected.items():
-            self.runtime.put(relative, raw)
-        self.runtime.put('homes/swe/' + AUTH_FILE, codex_auth())
-        for relative in ('homes/swe/.cache/codex/cache', 'homes/swe/.codex/config.toml'):
-            self.runtime.put(relative, b'excluded provider state')
-        expected.update({'workspace/.git/' + ref.path: (self.runtime.remote / 'workspace/.git' / ref.path).read_bytes()
-                         for ref in tree_manifest(self.runtime.remote / 'workspace/.git', exclude_generated=False)})
-        with patch.object(self.runtime, 'confirm_stopped', return_value=True):
-            refs = self.runtime.collect_native_evidence()
-            self.assertEqual(refs, self.runtime.collect_native_evidence())
-        self.assertEqual({ref.path for ref in refs}, {'archive/' + path for path in expected})
-        for ref in refs:
-            relative = ref.path.removeprefix('archive/')
-            original = expected[relative]
-            self.assertEqual((ref.digest, ref.size), (c.digest(original), len(original)))
-            self.assertEqual((self.run / ref.path).read_bytes(), original)
-            self.assertEqual((self.runtime.remote / relative).read_bytes(), original)
-        changed = self.runtime.remote / 'homes/swe/.codex/log/codex-tui.log'
-        changed.write_bytes(b'changed after collection')
-        with patch.object(self.runtime, 'confirm_stopped', return_value=True), \
-             self.assertRaisesRegex(c.ContractError, 'differs from stopped source'):
-            self.runtime.collect_native_evidence()
-        self.assertEqual((self.run / 'archive/homes/swe/.codex/log/codex-tui.log').read_bytes(), b'native swe log\n')
-
-    def test_native_archive_preserves_job_bytes_and_git_without_touching_source_snapshot(self):
-        self.claim()
-        git = self.runtime.remote / 'workspace/.git'
-        original_git = {ref.path: (git / ref.path).read_bytes() for ref in tree_manifest(git, exclude_generated=False)}
-        original_source = tree_manifest(self.runtime.remote / 'workspace')
-        messages = {
-            'jobs/complete/request.json': b'{"argv":["/usr/bin/native"]}',
-            'jobs/complete/stdin': 'task\n\ud55c'.encode(),
-            'jobs/complete/stdout': b'Native return\nCurrent factual state:\n{}\nRequirement judgments:\n[]\n',
-            'jobs/complete/result.json': b'{"outcome":"completed","exit_code":0,"error":null}',
-            'jobs/interrupted/stdout': b'Partial native output without a result',
-            'jobs/interrupted/result.tmp': b'{"outcome":',
-        }
-        for relative, raw in messages.items():
-            self.runtime.put(relative, raw)
-        with patch.object(self.runtime, 'confirm_stopped', return_value=True):
-            refs = self.runtime.collect_native_evidence()
-        for relative, raw in messages.items():
-            self.assertEqual((self.run / 'archive' / relative).read_bytes(), raw)
-            self.assertEqual((self.runtime.remote / relative).read_bytes(), raw)
-        for relative, raw in original_git.items():
-            self.assertEqual((self.run / 'archive/workspace/.git' / relative).read_bytes(), raw)
-            self.assertEqual((git / relative).read_bytes(), raw)
-        self.assertEqual(tree_manifest(self.runtime.remote / 'workspace'), original_source)
-        self.assertFalse((self.run / 'archive/jobs/interrupted/result.json').exists())
-        self.assertTrue(any(ref.path.startswith('archive/workspace/.git/objects/') for ref in refs))
-
-    def test_native_archive_requires_stopped_processes(self):
-        with patch.object(self.runtime, 'confirm_stopped', return_value=False), \
-             patch.object(self.runtime, 'rpc') as rpc, \
-             self.assertRaisesRegex(c.ContractError, 'requires stopped processes'):
-            self.runtime.collect_native_evidence()
-        rpc.assert_not_called()
-
-    def test_native_archive_withholds_known_secrets_without_changing_originals(self):
-        self.claim()
-        secret = b'synthetic-codex-secret'
-        CredentialVault(self.runtime.control).replace(codex_auth(secret.decode()))
-        raw = b'x' * (worker_files.CHUNK_BYTES - 3) + secret + b'original tail'
-        for name in ('log/codex-tui.log', 'sessions/2026/rollout.jsonl'):
-            relative = 'homes/swe/.codex/' + name
-            with self.subTest(name=name):
-                self.runtime.put(relative, raw)
-                with patch.object(self.runtime, 'confirm_stopped', return_value=True), \
-                     self.assertRaisesRegex(c.ContractError, 'Known authentication material'):
-                    self.runtime.collect_native_evidence()
-                self.assertFalse((self.run / 'archive' / relative).exists())
-                self.assertEqual((self.runtime.remote / relative).read_bytes(), raw)
-                (self.runtime.remote / relative).unlink()
 
     def test_missing_setup_resolver_prevents_dispatch(self):
         self.claim()
@@ -650,7 +509,7 @@ raise SystemExit(7)
                 raise FileNotFoundError('host resolver is unavailable')
             return read_bytes(path)
         with patch.object(Path, 'read_bytes', missing), \
-             patch('benchkit.runtime.checked_command') as launch, \
+             patch('worker_sandbox.runtime.checked_command') as launch, \
              self.assertRaisesRegex(FileNotFoundError, 'host resolver is unavailable'):
             self.runtime.invoke(self.request())
         launch.assert_not_called()
@@ -660,7 +519,7 @@ raise SystemExit(7)
         self.claim()
         relative = 'jobs/' + self.request().name + '/resolv.conf'
         self.runtime.put(relative, b'existing evidence')
-        with patch('benchkit.runtime.checked_command') as launch, self.assertRaises(FileExistsError):
+        with patch('worker_sandbox.runtime.checked_command') as launch, self.assertRaises(FileExistsError):
             self.runtime.invoke(self.request())
         launch.assert_not_called()
         self.assertEqual(self.runtime.read(relative), b'existing evidence')
@@ -681,29 +540,6 @@ raise SystemExit(7)
                              ('workspace', str(self.root / 'foreign/workspace'))):
             with self.subTest(field=field), self.assertRaisesRegex(c.ContractError, 'another run'):
                 self.runtime._job(msgspec.structs.replace(self.request(), **{field: value}))
-
-    def test_credentials_cross_conditions_but_context_never_does(self):
-        vault = CredentialVault(self.runtime.control)
-        vault.replace(codex_auth())
-        original_remote = self.runtime.remote
-        for index, condition in enumerate((*CELLS, 'DEFAULT_OFF')):
-            with self.subTest(condition=condition, attempt=index):
-                self.runtime.run = self.root / f'{index + 1:032x}'
-                (self.runtime.run / 'workspace').mkdir(parents=True)
-                self.runtime.remote = original_remote.parent / self.runtime.run.name
-                self.claim()
-                self.assertEqual(self.runtime.read('homes/swe/' + AUTH_FILE), codex_auth())
-                self.assertEqual(self.home_files(), [AUTH_FILE])
-                self.assertEqual(self.runtime.files('workspace'), ())
-                marker = f'prior-{condition}-{index}'
-                self.runtime.put('workspace/marker.txt', marker.encode())
-                self.runtime.put('homes/swe/.codex/history.jsonl', marker.encode())
-                with patch.object(self.runtime, 'confirm_stopped', return_value=True):
-                    self.runtime.release()
-                self.assertFalse(self.runtime.remote.exists())
-                self.assertTrue(self.runtime.rpc('empty'))
-                self.assertEqual(vault.load(), codex_auth())
-                self.assertNotIn(marker.encode(), vault.load())
 
     def test_residue_blocks_reclaim_and_does_not_delete_the_other_run(self):
         self.claim()
@@ -728,208 +564,31 @@ raise SystemExit(7)
         self.assertEqual(marker.read_bytes(), b'original failed attempt')
         self.assertNotIn('init', [call.args[0] for call in self.runtime.rpc.call_args_list])
 
-    def test_malformed_credential_is_still_scanned_and_recorded_at_release_without_keeping_the_lease(self):
-        vault = CredentialVault(self.runtime.control)
-        vault.replace(codex_auth())
-        self.claim()
-        changed = json.loads(codex_auth(token='changed-layout-access-token'))
-        changed['unknown_field'] = True
-        malformed = c.dumps(changed)
-        (self.runtime.remote / 'homes/swe' / AUTH_FILE).write_bytes(malformed)
-        with self.assertRaisesRegex(MalformedCredentials, 'malformed'):
-            self.runtime.sync_credentials()
-        with patch.object(self.runtime, 'confirm_stopped', return_value=True):
-            self.runtime.put('jobs/leak.log', b'native log with changed-layout-access-token inside')
-            with self.assertRaisesRegex(c.ContractError, 'Known authentication material'):
-                self.runtime.collect_native_evidence()
-            (self.runtime.remote / 'jobs/leak.log').write_bytes(b'native log without credentials')
-            self.runtime.collect_native_evidence()
-            self.runtime.collect_workspace()
-            self.runtime.release()
-        self.assertFalse(self.runtime.remote.exists())
-        self.assertFalse(self.runtime.lease.exists())
-        self.assertEqual(vault.load(), codex_auth())
-        preserved, = vault.root.glob('malformed-*')
-        self.assertEqual(preserved.read_bytes(), malformed)
-        note, = (self.run / 'artifacts').glob('credential-release-*.json')
-        self.assertIn('malformed at release; private copy preserved as ' + preserved.name,
-                      json.loads(note.read_bytes())['detail'])
-        self.assertNotIn(b'changed-layout-access-token', note.read_bytes())
-
-    def test_refresh_is_saved_before_worker_removal(self):
-        vault = CredentialVault(self.runtime.control)
-        vault.replace(codex_auth())
-        self.claim()
-        auth = self.runtime.remote / 'homes/swe' / AUTH_FILE
-        auth.write_bytes(codex_auth(token='refreshed-access'))
-        with patch.object(self.runtime, 'confirm_stopped', return_value=True):
-            self.runtime.release()
-        self.assertEqual(vault.load(), codex_auth(token='refreshed-access'))
-
-    def test_implementer_session_evidence_and_archive_exclude_credentials(self):
-        vault = CredentialVault(self.runtime.control)
-        vault.replace(codex_auth())
-        self.claim()
-        self.assertEqual([path.name for path in (self.runtime.remote / 'homes').iterdir()], ['swe'])
-        self.assertEqual((self.runtime.remote / 'homes/swe' / AUTH_FILE).read_bytes(), codex_auth())
-        original = c.dumps({'type': 'session_meta', 'payload': {'id': 'swe-native-session'}}) + b'\n'
-        relative = 'homes/swe/.codex/sessions/session.jsonl'
-        self.runtime.put(relative, original)
-        evidence = self.runtime.model_evidence('swe-native-session', self.run / 'artifacts/swe.jsonl')
-        self.assertEqual((self.run / evidence.path).read_bytes(), original)
-        self.assertIsNone(self.runtime.model_evidence('foreign-native-session', self.run / 'artifacts/foreign.jsonl'))
-        with patch.object(self.runtime, 'confirm_stopped', return_value=True):
-            references = self.runtime.collect_native_evidence()
-        self.assertEqual((self.run / 'archive' / relative).read_bytes(), original)
-        self.assertIn('archive/' + relative, {ref.path for ref in references})
-        self.assertFalse(any(ref.path.endswith('/auth.json') for ref in references))
-
     def test_implementer_receives_only_declared_environment(self):
+        self.runtime.agent = claude('/usr/bin/native')
         self.claim()
         self.runtime.service_active = True
-        self.runtime.payment_url = 'http://127.0.0.1:18765'
         with patch.dict(os.environ, {'BENCHKIT_ROLE_CHANNEL': '/personal/roles', 'BENCHKIT_PARENT_CALL': 'personal-call'}):
+            for name in self.runtime.agent.credential_env:
+                os.environ.pop(name, None)
             job = self.runtime._job(self.request())
         environment = json.loads(self.runtime.read(job + '/request.json'))['environment']
         self.assertNotIn('BENCHKIT_ROLE_CHANNEL', environment)
         self.assertNotIn('BENCHKIT_PARENT_CALL', environment)
         self.assertNotIn(self.runtime.worker_path('bin'), environment['PATH'].split(':'))
-        self.assertEqual(environment['HOME'], self.runtime.worker_path('homes/swe'))
-        self.assertEqual(environment['CODEX_HOME'], self.runtime.worker_path('homes/swe/.codex'))
-        self.assertEqual(environment['XDG_CONFIG_HOME'], self.runtime.worker_path('homes/swe/.config'))
-        self.assertEqual(environment['TMPDIR'], self.runtime.worker_path('tmp'))
-        self.assertEqual(environment['PAYMENT_PROVIDER_URL'], 'http://127.0.0.1:18765')
-
-    def test_refresh_is_carried_across_calls_and_written_back(self):
-        vault = CredentialVault(self.runtime.control)
-        initial, first, second = codex_auth(), codex_auth(token='first-refresh'), codex_auth(token='second-refresh')
-        vault.replace(initial)
-        self.claim()
-        auth = self.runtime.remote / 'homes/swe' / AUTH_FILE
-        self.assertEqual(self.runtime.sync_credentials(), 'unchanged')
-        auth.write_bytes(first)
-        self.assertEqual(self.runtime.sync_credentials(), 'refreshed')
-        self.assertEqual(vault.load(), first)
-        self.assertEqual(auth.read_bytes(), first)
-        auth.write_bytes(second)
-        self.assertEqual(self.runtime.sync_credentials(), 'refreshed')
-        self.assertEqual(vault.load(), second)
-        self.assertLessEqual({b'synthetic-access', b'first-refresh', b'second-refresh'}, set(vault.seen(self.run.name)))
-        with patch.object(self.runtime, 'confirm_stopped', return_value=True):
-            self.runtime.release()
-        self.assertEqual(vault.load(), second)
-        self.assertFalse(self.runtime.remote.exists())
-        self.assertFalse(self.runtime.lease.exists())
-        self.assertEqual({path.name for path in vault.root.iterdir()}, {'.lock', 'codex-openai.json'})
-
-    def test_account_mismatch_is_rejected_and_preserved_privately(self):
-        vault = CredentialVault(self.runtime.control)
-        vault.replace(codex_auth())
-        self.claim()
-        foreign = codex_auth(token='foreign-secret', account='different-account')
-        (self.runtime.remote / 'homes/swe' / AUTH_FILE).write_bytes(foreign)
-        with self.assertRaisesRegex(AccountMismatch, 'not the vault account') as raised:
-            self.runtime.sync_credentials()
-        self.assertNotIn('foreign-secret', str(raised.exception))
-        self.assertEqual(vault.load(), codex_auth())
-        preserved, = vault.root.glob('mismatch-*')
-        self.assertEqual(preserved.read_bytes(), foreign)
-        with patch.object(self.runtime, 'confirm_stopped', return_value=True):
-            self.runtime.release()
-        self.assertFalse(self.runtime.lease.exists())
-        self.assertEqual(vault.load(), codex_auth())
-        note, = (self.run / 'artifacts').glob('credential-release-*.json')
-        self.assertIn('not the vault account', json.loads(note.read_bytes())['detail'])
-        self.assertNotIn(b'foreign-secret', note.read_bytes())
-
-    def test_missing_credential_at_release_is_recorded_and_releases_the_lease(self):
-        vault = CredentialVault(self.runtime.control)
-        vault.replace(codex_auth())
-        self.claim()
-        (self.runtime.remote / 'homes/swe' / AUTH_FILE).unlink()
-        self.assertEqual(self.runtime.sync_credentials(), 'missing')
-        with patch.object(self.runtime, 'confirm_stopped', return_value=True):
-            self.runtime.release()
-        self.assertFalse(self.runtime.remote.exists())
-        self.assertFalse(self.runtime.lease.exists())
-        self.assertEqual(vault.load(), codex_auth())
-        note, = (self.run / 'artifacts').glob('credential-release-*.json')
-        self.assertIn('missing at release', json.loads(note.read_bytes())['detail'])
-
-    def test_injected_then_rotated_token_is_still_detected_by_the_secret_scan(self):
-        vault = CredentialVault(self.runtime.control)
-        vault.replace(codex_auth(token='injected-secret'))
-        self.claim()
-        (self.runtime.remote / 'homes/swe' / AUTH_FILE).write_bytes(codex_auth(token='rotated-secret'))
-        self.assertEqual(self.runtime.sync_credentials(), 'refreshed')
-        self.assertNotIn(b'injected-secret', vault.load())
-        self.runtime.put('jobs/leak.log', b'native log with injected-secret inside')
-        # A recovering controller has no memory of the injected value; the private per-run set does.
-        recovered = NativeRuntime(c.RuntimeSpec(), self.run)
-        recovered.remote, recovered.control, recovered.lease = self.runtime.remote, self.runtime.control, self.runtime.lease
-        with patch.object(recovered, 'rpc', side_effect=self.runtime.rpc), \
-             patch.object(recovered, 'bridge_command', side_effect=self.runtime.bridge_command), \
-             patch.object(recovered, 'confirm_stopped', return_value=True), \
-             self.assertRaisesRegex(c.ContractError, 'Known authentication material'):
-            recovered.collect_native_evidence()
-        self.assertFalse((self.run / 'archive/jobs/leak.log').exists())
-
-    def test_login_imports_a_validated_credential_from_a_private_staging_home(self):
-        spec = SimpleNamespace(control_root=str(self.runtime.control))
-        calls = []
-
-        def device_login(argv, *, cwd, env, check):
-            calls.append((argv, cwd, env))
-            self.assertEqual(Path(cwd).parent, self.runtime.control)
-            self.assertEqual(Path(cwd).stat().st_mode & 0o777, 0o700)
-            self.assertEqual((env['HOME'], env['CODEX_HOME']), (cwd, cwd + '/.codex'))
-            (Path(env['CODEX_HOME']) / 'auth.json').write_bytes(accounts.pop(0))
-            return SimpleNamespace(returncode=0)
-
-        accounts = [codex_auth(), codex_auth(account='different-account')]
-        with patch('benchkit.runtime.subprocess.run', side_effect=device_login), \
-             patch.object(NativeRuntime, 'verify_model') as verify:
-            self.assertEqual(native_login(spec, self.model),
-                             {'account_id': 'synthetic-account', 'previous_account_id': None})
-            self.assertEqual(native_login(spec, self.model),
-                             {'account_id': 'different-account', 'previous_account_id': 'synthetic-account'})
-        self.assertEqual([call[0] for call in calls], [(self.model.binary, 'login', '--device-auth')] * 2)
-        self.assertEqual(verify.call_count, 2)
-        vault = CredentialVault(self.runtime.control)
-        self.assertEqual(vault.load(), codex_auth(account='different-account'))
-        self.assertEqual({path.name for path in self.runtime.control.iterdir()}, {'credentials', 'owner.lock'})
-
-    def test_login_failures_leave_the_vault_unchanged(self):
-        spec = SimpleNamespace(control_root=str(self.runtime.control))
-        vault = CredentialVault(self.runtime.control)
-        vault.replace(codex_auth())
-        cases = ((SimpleNamespace(returncode=1), None, 'native login failed'),
-                 (SimpleNamespace(returncode=0), None, 'no credential file'),
-                 (SimpleNamespace(returncode=0), b'{"history":"prior context"}', 'malformed'))
-        for completed, written, error in cases:
-            def device_login(argv, *, cwd, env, check):
-                if written is not None:
-                    (Path(env['CODEX_HOME']) / 'auth.json').write_bytes(written)
-                return completed
-            with self.subTest(error=error), patch('benchkit.runtime.subprocess.run', side_effect=device_login), \
-                 patch.object(NativeRuntime, 'verify_model'), self.assertRaisesRegex(c.ContractError, error):
-                native_login(spec, self.model)
-            self.assertEqual(vault.load(), codex_auth())
-            self.assertFalse(list(self.runtime.control.glob('.login-*')))
-        self.claim()
-        with patch('benchkit.runtime.subprocess.run') as run, \
-             self.assertRaisesRegex(c.ContractError, 'outside any run'):
-            native_login(spec, self.model)
-        run.assert_not_called()
+        home = self.runtime.worker_path('home')
+        self.assertEqual(environment, {
+            'PATH': '/usr/local/bin:/usr/bin:/bin', 'LANG': 'C.UTF-8', 'HOME': home,
+            'CLAUDE_CONFIG_DIR': home + '/.claude', 'XDG_CONFIG_HOME': home + '/.config',
+            'XDG_DATA_HOME': home + '/.local/share', 'XDG_CACHE_HOME': home + '/.cache',
+            'XDG_STATE_HOME': home + '/.local/state', 'DISABLE_TELEMETRY': '1', 'DISABLE_ERROR_REPORTING': '1',
+            'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC': '1', 'TMPDIR': self.runtime.worker_path('tmp')})
 
     def test_invalid_binary_stops_login_before_any_subprocess(self):
-        spec = SimpleNamespace(control_root=str(self.runtime.control))
-        vault = CredentialVault(self.runtime.control)
-        vault.replace(codex_auth())
         binary = (self.run / 'native-fixture').resolve()
         binary.write_bytes(b'fixture executable\n')
         binary.chmod(0o755)
-        model = msgspec.structs.replace(self.model, binary=str(binary), binary_digest='sha256:' + '0' * 64)
+        frozen = 'sha256:' + '0' * 64
         installation = {binary, *binary.parents}
         real_stat = Path.stat
 
@@ -953,26 +612,26 @@ raise SystemExit(7)
         for invalid_path, owner, writable, error in cases:
             with self.subTest(path=invalid_path, owner=owner, writable=writable), \
                  patch.object(Path, 'stat', installation_stat), \
-                 patch('benchkit.runtime.subprocess.run') as run:
+                 patch('worker_sandbox.runtime.subprocess.run') as run:
                 if invalid_path is None:
-                    valid = msgspec.structs.replace(model, binary_digest=c.digest(binary.read_bytes()))
-                    self.assertEqual(NativeRuntime.verify_model(valid), valid.binary_digest)
+                    identity = c.digest(binary.read_bytes())
+                    self.assertEqual(NativeRuntime.verify_model(str(binary), identity), identity)
+                    self.assertEqual(NativeRuntime.verify_model(str(binary), None), identity)
                 with self.assertRaisesRegex(c.ContractError, error):
-                    native_login(spec, model)
+                    NativeRuntime.verify_model(str(binary), frozen)
                 run.assert_not_called()
-            self.assertEqual(vault.load(), codex_auth())
-            self.assertFalse(list(self.runtime.control.glob('.login-*')))
 
     def test_private_environment_and_role_home(self):
+        self.runtime.agent = codex('/usr/bin/native')
         self.claim()
         with patch.dict(os.environ, {'JEV_API_KEY': 'do-not-forward', 'CODEX_MODEL': 'personal'}):
             relative = self.runtime._job(self.request())
         job = json.loads(self.runtime.read(relative + '/request.json'))
         self.assertNotIn('JEV_API_KEY', job['environment'])
         self.assertNotIn('CODEX_MODEL', job['environment'])
-        self.assertEqual(job['environment']['PATH'], '/opt/benchkit-python/bin:/usr/local/bin:/usr/bin:/bin')
-        self.assertTrue(job['environment']['CODEX_HOME'].endswith('/homes/swe/.codex'))
-        self.assertTrue(job['environment']['XDG_CONFIG_HOME'].endswith('/homes/swe/.config'))
+        self.assertEqual(job['environment']['PATH'], '/usr/local/bin:/usr/bin:/bin')
+        self.assertTrue(job['environment']['CODEX_HOME'].endswith('/home/.codex'))
+        self.assertTrue(job['environment']['XDG_CONFIG_HOME'].endswith('/home/.config'))
 
     def test_failed_collection_preserves_previous_mirror(self):
         self.claim()
@@ -1000,55 +659,13 @@ raise SystemExit(7)
             bridge.reset_mock()
             self.runtime.collect_workspace()
             self.assertEqual(bridge.call_count, 1)
-            bridge.reset_mock()
-            for index in range(300):
-                self.runtime.put('jobs/' + str(index), b'native original')
-            with patch.object(self.runtime, 'confirm_stopped', return_value=True):
-                references = self.runtime.collect_native_evidence()
-            self.assertEqual(bridge.call_count, 1)
-        self.assertEqual(sum(ref.path.startswith('archive/jobs/') for ref in references), 300)
         self.assertEqual(len(tree_manifest(self.run / 'workspace')), 300)
-
-    def test_workspace_secret_withholds_entire_mirror_before_publication(self):
-        self.claim()
-        (self.run / 'workspace/old').write_bytes(b'original mirror')
-        secret = b'synthetic-codex-secret'
-        CredentialVault(self.runtime.control).replace(codex_auth(secret.decode()))
-        self.runtime.put('workspace/normal', b'public bytes')
-        self.runtime.put('workspace/nested/leak', secret)
-        with self.assertRaisesRegex(c.ContractError, 'Known authentication material'):
-            self.runtime.collect_workspace()
-        self.assertEqual((self.run / 'workspace/old').read_bytes(), b'original mirror')
-        self.assertFalse((self.run / 'workspace/normal').exists())
-        self.assertEqual((self.runtime.remote / 'workspace/nested/leak').read_bytes(), secret)
-
-    def test_secret_in_native_filename_withholds_all_new_archive_entries(self):
-        self.claim()
-        secret = 'synthetic-codex-secret'
-        CredentialVault(self.runtime.control).replace(codex_auth(secret))
-        self.runtime.put('jobs/ordinary', b'public content')
-        self.runtime.put('jobs/' + secret, b'public content')
-        with patch.object(self.runtime, 'confirm_stopped', return_value=True), \
-             self.assertRaisesRegex(c.ContractError, 'Known authentication material'):
-            self.runtime.collect_native_evidence()
-        self.assertFalse((self.run / 'archive').exists())
-
-    def test_native_archive_rejects_parent_link_before_creating_outside_directories(self):
-        self.claim()
-        outside = self.root / 'outside'
-        outside.mkdir()
-        (self.run / 'archive').mkdir()
-        (self.run / 'archive/jobs').symlink_to(outside, target_is_directory=True)
-        self.runtime.put('jobs/nested/result', b'native evidence')
-        with patch.object(self.runtime, 'confirm_stopped', return_value=True), self.assertRaises(OSError):
-            self.runtime.collect_native_evidence()
-        self.assertEqual(list(outside.iterdir()), [])
 
     def test_interrupted_mirror_publication_preserves_previous_tree(self):
         self.claim()
         (self.run / 'workspace/old').write_bytes(b'previous mirror')
         self.runtime.put('workspace/new', b'collected mirror')
-        with patch('benchkit.artifacts._rename_directory', side_effect=KeyboardInterrupt), \
+        with patch('worker_sandbox.artifacts._rename_directory', side_effect=KeyboardInterrupt), \
              self.assertRaises(KeyboardInterrupt):
             self.runtime.collect_workspace()
         self.assertEqual((self.run / 'workspace/old').read_bytes(), b'previous mirror')
@@ -1067,15 +684,15 @@ raise SystemExit(7)
                 self.runtime.cleanup('bk-' + 'b' * 32)
 
     def test_unit_collected_between_inspect_and_stop_is_confirmed_absent(self):
-        states = [{'User':'food-delivery', 'LoadState':'loaded'}, {'LoadState':'not-found'}]
+        states = [{'User':'worker-sandbox', 'LoadState':'loaded'}, {'LoadState':'not-found'}]
         with patch.object(self.runtime, 'state', side_effect=states), \
-             patch('benchkit.runtime.checked_command', side_effect=RuntimeError('Unit not loaded')):
+             patch('worker_sandbox.runtime.checked_command', side_effect=RuntimeError('Unit not loaded')):
             self.assertTrue(self.runtime.cleanup('bk-' + 'b' * 32))
 
     def test_failed_stop_of_existing_unit_is_not_hidden(self):
-        state = {'User':'food-delivery', 'LoadState':'loaded', 'ActiveState':'active'}
+        state = {'User':'worker-sandbox', 'LoadState':'loaded', 'ActiveState':'active'}
         with patch.object(self.runtime, 'state', return_value=state), \
-             patch('benchkit.runtime.checked_command', side_effect=RuntimeError('permission denied')):
+             patch('worker_sandbox.runtime.checked_command', side_effect=RuntimeError('permission denied')):
             with self.assertRaisesRegex(RuntimeError, 'permission denied'):
                 self.runtime.cleanup('bk-' + 'b' * 32)
 
@@ -1090,30 +707,10 @@ raise SystemExit(7)
         self.assertFalse(self.runtime.remote.exists())
         self.assertFalse(self.runtime.lease.exists())
 
-    def test_reset_requires_the_lease_and_a_stopped_service(self):
-        expected = self.seed()
-        (self.runtime.remote / 'homes/swe/state').write_bytes(b'previous')
-        self.runtime.service_active = True
-        with patch.object(self.runtime, 'confirm_stopped', return_value=True), \
-             self.assertRaisesRegex(c.ContractError, 'stopped run service'):
-            self.runtime.reset()
-        self.runtime.service_active = False
-        with patch.object(self.runtime, 'confirm_stopped', return_value=False), \
-             self.assertRaisesRegex(c.ContractError, 'stopped run service'):
-            self.runtime.reset()
-        self.assertTrue((self.runtime.remote / 'homes/swe/state').exists())
-        with patch.object(self.runtime, 'confirm_stopped', return_value=True):
-            self.runtime.reset()
-        self.assertFalse((self.runtime.remote / 'homes/swe/state').exists())
-        self.runtime.verify_seed(expected)
-        self.runtime.lease.write_bytes(c.dumps({'run': 'another'}))
-        with self.assertRaisesRegex(c.ContractError, 'lease does not belong'):
-            self.runtime.reset()
-
     def test_invocation_failure_preserves_primary_reason_when_cleanup_fails(self):
         self.claim()
         request = self.request()
-        with patch('benchkit.runtime.checked_command', return_value=b''), \
+        with patch('worker_sandbox.runtime.checked_command', return_value=b''), \
              patch.object(self.runtime, '_observe', return_value={'outcome':'cancelled','exit_code':None,'error':'cancelled'}), \
              patch.object(self.runtime, 'cleanup', side_effect=RuntimeError('stop failed')):
             result = self.runtime.invoke(request)
@@ -1131,8 +728,8 @@ raise SystemExit(7)
         terminal = {'outcome': 'completed', 'exit_code': 0, 'error': None}
         with patch.object(self.runtime, 'rpc', side_effect=[{'result': None}, {'result': terminal}]), \
              patch.object(self.runtime, 'state', return_value={'ActiveState': 'active', 'MainPID': '1234'}), \
-             patch('benchkit.runtime.time.monotonic', return_value=10**12), \
-             patch('benchkit.runtime.time.sleep'):
+             patch('worker_sandbox.runtime.time.monotonic', return_value=10**12), \
+             patch('worker_sandbox.runtime.time.sleep'):
             result = self.runtime._observe(self.request(), 'jobs/test', lambda: False)
         self.assertEqual(result, terminal)
         with patch.object(self.runtime, 'rpc') as rpc:
@@ -1157,7 +754,6 @@ raise SystemExit(7)
                 return dead if unit == failed else alive
             with self.subTest(active=active, failed=failed), \
                  patch.object(self.runtime, 'rpc', return_value={'result': None}), \
-                 patch.object(self.runtime, 'handle_payments'), \
                  patch.object(self.runtime, 'state', side_effect=state):
                 result = self.runtime._observe(self.request(), 'jobs/test', None)
             self.assertEqual(result['outcome'], 'harness_error')
@@ -1172,7 +768,7 @@ raise SystemExit(7)
                 request = msgspec.structs.replace(self.request(), name='bk-' + f'{index + 10 * active:032x}',
                     log_dir=str(self.run / 'raw' / f'{active}-{outcome}'))
                 with self.subTest(active=active, outcome=outcome), \
-                     patch('benchkit.runtime.checked_command', return_value=b'') as launch, \
+                     patch('worker_sandbox.runtime.checked_command', return_value=b'') as launch, \
                      patch.object(self.runtime, '_observe', return_value={'outcome':outcome,'exit_code':0,'error':None}), \
                      patch.object(self.runtime, 'cleanup', return_value=True) as cleanup:
                     result = self.runtime.invoke(request)

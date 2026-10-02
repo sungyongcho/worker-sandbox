@@ -15,16 +15,17 @@ Verbatim import commit in this repository: 5ddf473.
 | worker_sandbox/contracts.py | benchkit/contracts.py | 1-4, 6-11, 13-15, 17-18, 31, 35-48, 60-63, 68-91, 256-266, 505-576, 580-592 | see "contracts.py" below |
 | tools/setup_host.py | tools/setup_host.py | 1-59 | none yet |
 | tools/doctor.py | tools/verify_host.py | 1-263 | none yet |
-| tools/verify_package.py | tools/verify_package.py | 1-136 | none yet |
-| tests/test_runtime.py | tests/test_runtime.py | 1-1192 | none yet |
-| tests/test_bulk_transfer.py | tests/test_bulk_transfer.py | 1-256 | none yet |
-| tests/test_architecture.py | tests/test_architecture.py | 1-68 | none yet |
-| tests/fixtures.py | tests/fixtures.py | 1-236 | none yet |
+| tools/verify_package.py | tools/verify_package.py | 1-136 | see "verify_package.py" below |
+| tests/test_runtime.py | tests/test_runtime.py | 1-1192 | see "test_runtime.py" below |
+| tests/test_bulk_transfer.py | tests/test_bulk_transfer.py | 1-256 | see "test_bulk_transfer.py" below |
+| tests/test_architecture.py | tests/test_architecture.py | 1-68 | see "test_architecture.py" below |
+| tests/fixtures.py | tests/fixtures.py | 1-236 | see "fixtures.py" below |
 | worker_sandbox/__init__.py | new | | |
 | worker_sandbox/profiles.py | new (Codex facts from benchkit/adapters.py L12, L96-99, L177-184, L265-267 and runtime.py L69-73) | | |
 | worker_sandbox/hostconfig.py | new | | |
+| tests/test_profiles.py | new | | |
 | Makefile | Makefile | 1-9 | none |
-| requirements-dev.txt | requirements-dev.txt | 1-2 | none |
+| requirements-dev.txt | requirements-dev.txt | 2 | step 8: dropped jsonschema==4.26.0 (no schema check is carried; section 5) |
 | .gitignore | .gitignore | 1-13 | added /verification/, /runs/, /sandbox-runs/ |
 | pyproject.toml | pyproject.toml | 1-20 | adapted: name, description, script, package; package data dropped |
 
@@ -93,3 +94,42 @@ Verbatim import commit in this repository: 5ddf473.
 - step 5: deleted _snapshot (L126-150) with its two trailing blank lines
 - step 5: deleted copy_artifact (L163-169) with its two trailing blank lines
 - step 5: deleted snapshot (L183-187) with the two blank lines before it
+
+## test_runtime.py
+- step 8: imports: benchkit -> worker_sandbox; dropped the credentials and adapters imports and native_login; added the profiles import; fixtures import reduced to codex_auth
+- step 8: every patch target 'benchkit.<module>.' -> 'worker_sandbox.<module>.'
+- step 8: dropped (section 10.1): 66 reset_keeps..., 110 native_archive_rejects_linked..., 206 supervisor_reports_gateway_exit..., 279 changed_run_profile..., 564, 595, 622, 629 (native archive), 685 credentials_cross_conditions..., 731, 759, 769, 803, 825, 845, 859 (vault, refresh, mismatch, scan), 1012, 1025, 1036 (secret scan, archive), 1093 reset_requires...
+- step 8: 877 and 902 (login) removed here and re-added adapted with the login command in step 9
+- step 8: setUp: deleted `self.model = WORKER` (ModelSpec is not carried); NativeRuntime(c.RuntimeSpec(), self.run) -> NativeRuntime(c.RuntimeSpec(), self.run, generic('/usr/bin/native'))
+- step 8: request(), home_files(): homes/swe -> home; claim(): seed import path
+- step 8: 102 file_listing_never_exposes_a_native_home: homes/swe -> home
+- step 8: 255 existing_lease_preserves_native_credentials_without_reseeding: codex profile with a staged .codex/auth.json from fixtures.codex_auth() instead of the vault; the no-reseed assertion stays
+- step 8: 264 custom_profile_is_seeded_into_codex_home_only_and_verified -> home_dir_is_seeded_into_codex_home_only_and_verified: home_dir files land under home/ and read back identical, beside the staged auth.json
+- step 8: 288 grader_runtime_does_not_seed_native_credentials: staged codex file instead of the vault; authentication=False still seeds nothing
+- step 8: 517: User=food-delivery -> User=worker-sandbox
+- step 8: 532 setup_resolver_survives_hidden_host_target_and_is_archived: deleted the five collect_native_evidence lines (L558-562); name kept
+- step 8: 787 implementer_receives_only_declared_environment: claude profile; exact expected environment (no PAYMENT_PROVIDER_URL, HOME at .../home, profile environment and CLAUDE_CONFIG_DIR, nothing from os.environ)
+- step 8: 925 invalid_binary_stops_login_before_any_subprocess: calls NativeRuntime.verify_model(binary, digest) directly instead of native_login; same stat cases; also checks a None digest returns the identity
+- step 8: 966 private_environment_and_role_home: codex profile set first; PATH /usr/local/bin:/usr/bin:/bin; homes/swe -> home
+- step 8: 994 bulk_bridge_count_does_not_grow_with_file_count: deleted the native-evidence block (L1003-1009)
+- step 8: 1069, 1075: unit User food-delivery -> worker-sandbox
+- step 8: 1150: deleted the handle_payments patch line (L1160)
+
+## test_bulk_transfer.py
+- step 8: L15 benchkit -> worker_sandbox. Test 64 never calls native_evidence, so no assertion was removed
+
+## test_architecture.py
+- step 8: ROOT and the three package-name literals: benchkit -> worker_sandbox
+
+## fixtures.py
+- step 8: kept the docstring, json and Path imports, codex_auth (L16-20) and FakeRuntime (L157-236)
+- step 8: imports reduced to worker_sandbox contracts and tree_manifest
+- step 8: FakeRuntime: dropped sync_credentials, read_credentials, collect_native_evidence, observe_workspace, model_evidence, execution_request
+- step 8: FakeRuntime.verify_model(self, model) -> verify_model(self, binary, binary_digest), returning binary_digest (the NativeSpec argument is not carried)
+
+## verify_package.py
+- step 8: IMPORT_CHECK and OFFLINE_TESTS: benchkit -> worker_sandbox; distribution name worker-benchmark-kit -> worker-sandbox
+- step 8: offline guard: blocked executables gain "claude" beside "codex"
+- step 8: stripped environment: JEV_API_KEY -> ANTHROPIC_API_KEY and CLAUDE_CODE_OAUTH_TOKEN
+- step 8: temporary directory prefix benchkit-verification- -> worker-sandbox-verification-
+- step 8: no schema export check exists in the carried file; nothing dropped

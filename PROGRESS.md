@@ -6,12 +6,12 @@ Repository: <worker-sandbox>
 Import commit: 5ddf473
 
 ## State
-- Current step: 8 Tests
+- Current step: 9 CLI
 - Status: in progress
-- Last commit: this commit feat: add agent profiles and host configuration
+- Last commit: this commit test: port the sandbox tests
 - Working tree: clean
-- Offline suite: 2 passed, 2 import errors (tests still import benchkit until step 8) at this commit; run from the repository root with .venv/bin/python -I -B -m unittest discover -s tests
-- Next action: port tests per section 10 (fixtures subset, test_runtime dispositions, test_bulk_transfer, test_architecture ROOT, new test_profiles.py), apply 6.12 to tools/verify_package.py, then run the suite until it passes
+- Offline suite: 80 passed at this commit (pip install the repo into .venv first; -I imports the installed package); verify_package passed: verification/package-20261002T070216Z.json
+- Next action: write worker_sandbox/__main__.py (section 6.9), parameterize tools/setup_host.py (6.10), add tests/test_cli.py, re-add tests 877 and 902 adapted to login, run the suite and verify_package
 - Blocked on: none
 
 ## Step log
@@ -23,9 +23,9 @@ Import commit: 5ddf473
 | 4 Remove the payment fixture | done | ffae987 | |
 | 5 Remove evidence and vault features | done | b9aa4bc | |
 | 6 Parameterize | done | 17f7f42 | |
-| 7 Profiles and host config | done | this commit | |
-| 8 Tests | in progress | | |
-| 9 CLI | pending | | |
+| 7 Profiles and host config | done | 934adfa | |
+| 8 Tests | done | this commit | 6.12 verify_package edits included | |
+| 9 CLI | in progress | | |
 | 10 Doctor | pending | | owner present for sudo -v |
 | 11 Live acceptance | pending | | owner present |
 | 12 README | pending | | |

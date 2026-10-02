@@ -75,3 +75,25 @@ Observed: the brief gives the other commands no way to learn a non-default contr
 Did instead: hostconfig.read() takes an optional control_root and defaults to /var/lib/worker-sandbox-controller.
 A host provisioned with a custom --control-root needs a way to point the CLI at it; owner to decide
 (for example a --control-root option on every command).
+
+## 2026-10-02 tests/test_runtime.py:877
+Expected: tests 877 and 902 are adapted "to `worker-sandbox login`" (section 10.1) in step 8, and the suite passes before step 9.
+Observed: the login command is written in step 9.
+Did instead: step 8 removes both tests; step 9 re-adds them, adapted and under their names, in the same commit as the login command.
+
+## 2026-10-02 tests/test_runtime.py:1
+Expected: "about 46 of the 70 NativeRuntimeTests" (section 10.1).
+Observed: the disposition table keeps or adapts 43 NativeRuntimeTests (41 after step 8, 43 after step 9).
+Did instead: followed the table.
+
+## 2026-10-02 tests/test_runtime.py:1
+Expected: kept tests change only where they reference removed features (R7).
+Observed: tests 517, 1069 and 1075 assert the unit owner `food-delivery`, test 532 ends with a collect_native_evidence block,
+test 994 ends with one, and test 1150 patches handle_payments. All of these are removed or renamed features.
+Did instead: renamed the owner to worker-sandbox and deleted only those lines; names kept. Sentinel names that are not
+features (`@benchkit-` socket label in 386, BENCHKIT_* and JEV_API_KEY environment names that must not be forwarded) are left as they are.
+
+## 2026-10-02 tools/verify_package.py:54
+Expected: "Keep the offline guard that blocks network, `sudo`, `systemctl`, `systemd-run` and the agent binaries" (section 6.12).
+Observed: the carried guard blocks only `codex`; the stripped environment lists JEV_API_KEY.
+Did instead: added `claude` to the blocked executables and replaced JEV_API_KEY with the Claude credential variables.

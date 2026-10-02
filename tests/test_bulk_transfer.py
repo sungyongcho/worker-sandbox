@@ -12,7 +12,7 @@ import tracemalloc
 import unittest
 from unittest.mock import patch
 
-from benchkit import worker_files
+from worker_sandbox import worker_files
 
 
 def ref(path, content=b'', *, executable=False, target=None):
