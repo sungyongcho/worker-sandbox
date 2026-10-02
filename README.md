@@ -8,6 +8,29 @@ This is the run-only sandbox extracted from worker-benchmark-kit, the author's p
 benchmark repository. The isolation code is carried over as it was verified there;
 `PROVENANCE.md` maps every carried file to its source lines and lists each edit.
 
+## What it protects against
+
+The agent process cannot read or write your home directory, the controller's files or any of
+your credentials beyond the login files copied into the run and the variables you pass with
+`--env`, and it cannot reach services on the host or the LAN. Results come back as a copied workspace and the agent's raw output. It does not
+control what the provider adds server-side, the agent's own use of the internet, or resource use:
+there are no CPU, memory, disk or time limits.
+
+## Quick start (rootless)
+
+`./project` is the directory the agent works on. Replace `<version>` with the installed version of
+an agent installed as described in "Install the agents root-owned".
+
+```bash
+git clone https://github.com/sungyongcho/worker-sandbox.git && cd worker-sandbox
+python3.12 -m venv .venv
+.venv/bin/python -I -m pip install .
+.venv/bin/worker-sandbox setup-rootless
+.venv/bin/python -B tools/doctor.py --report verification/doctor-rootless-$(date -u +%Y%m%dT%H%M%SZ).json --profile claude --binary /usr/local/lib/worker-sandbox-claude/<version>/claude
+.venv/bin/worker-sandbox login --profile claude --binary /usr/local/lib/worker-sandbox-claude/<version>/claude
+printf 'Create a file named hello.txt containing the single word hello, then stop.\n' | .venv/bin/worker-sandbox run --profile claude --workspace ./project --out ./sandbox-runs --binary /usr/local/lib/worker-sandbox-claude/<version>/claude
+```
+
 ## How it works
 
 One run is one controller-side run directory and one worker-side mirror owned by a dedicated,
@@ -323,6 +346,36 @@ When your rootless `host.json` exists, `login`, `run`, `recover` and the doctor 
   permission prompts. Root mode is unchanged.
 - The rootless host config is chosen whenever it exists; `WORKER_SANDBOX_MODE=root` forces
   root mode. There is no `--mode` option yet.
+
+## Platform notes
+
+- Verified on one host: Ubuntu 26.04.1 LTS, kernel 7.0, systemd 259, Python 3.12 for the
+  controller environment and the system Python 3.14 at `/usr/bin/python3` for the worker bridge,
+  bubblewrap 0.11.1, slirp4netns 1.3.3, nftables 1.1.6, util-linux 2.41.3, Codex CLI 0.157.0 and
+  Claude Code 2.1.286.
+- Host tools are called by absolute path under `/usr/bin` and `/usr/sbin` (for example
+  `/usr/bin/unshare`, `/usr/sbin/nft`, `/usr/sbin/ip`). Distributions that place them elsewhere are
+  not verified.
+- The AppArmor profile requirement of rootless mode applies only where
+  `kernel.apparmor_restrict_unprivileged_userns = 1`.
+
+## Troubleshooting
+
+- `sudo -n` fails with "interactive authentication is required": run `sudo -v` in a terminal that
+  has a tty, then run the command in that same terminal. A command runner without that terminal,
+  such as an agent's shell, does not share the cached credential.
+- Rootless setup refuses because of AppArmor: check the setting with
+  `sysctl kernel.apparmor_restrict_unprivileged_userns`; when it is 1, the profile
+  `/etc/apparmor.d/bwrap-userns-restrict` must exist.
+- No entry for your user in `/etc/subuid` or `/etc/subgid`: add one as root, for example
+  `sudo usermod --add-subuids 100000-165535 --add-subgids 100000-165535 "$(id -un)"`.
+- The rootless worker root is missing (`systemd-tmpfiles` can remove unused directories under
+  `/var/tmp`): run `worker-sandbox setup-rootless` again; it recreates only the worker root.
+- Codex 0.157.0 with a ChatGPT account rejects `gpt-6.1-sol`: use `--model gpt-6-sol`.
+- Claude Code's login cannot open a browser: open the printed URL yourself and paste the code it
+  shows back into the terminal.
+- Exit code 0 and outcome `completed` mean the agent process ended normally, not that the task was
+  done. Check the files in `runs/<run_id>/workspace`.
 
 ## Repository
 
