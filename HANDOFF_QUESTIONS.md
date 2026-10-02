@@ -339,3 +339,14 @@ Did instead (5.4 / 7.4 enumerated edit): the Claude profile's command() adds `--
   systemd-tmpfiles and `worker-sandbox setup-rootless`; setup-rootless, when the rootless host.json exists and only its
   worker root is gone, recreates the worker root as recorded (provision_worker) and reports `repaired: true`; otherwise
   it still refuses an existing host.json. The owner and 0700 checks in inspect are unchanged.
+
+## 2026-10-02 Codex without its own sandbox in rootless mode (owner decision: option a)
+Owner decision: in rootless mode only, Codex runs without its own tool sandbox; root-mode argv stays byte-identical;
+the setting is added by the CLI as extra argv, not in profiles.py; measure first, keep the one setting that works;
+option (b), the outer-layer redesign (inner root builds the mount sandbox itself to avoid the unpriv_bwrap label), stays
+an unverified proposal and is not started.
+Measured: `-- -c 'sandbox_mode="danger-full-access"'` (runs/b5fc433a335344e4a88df1963381f5a1): exit 0, completed,
+command_execution completed, hello.txt = "hello". `--dangerously-bypass-approvals-and-sandbox` was therefore not needed
+and not tried.
+Did instead: worker_sandbox/__main__.py ROOTLESS_EXTRA = {'codex': ('-c', 'sandbox_mode="danger-full-access"')},
+prepended to EXTRA ARGV only when the spec mode is rootless; tests/test_cli.py checks both modes.

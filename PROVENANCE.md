@@ -26,7 +26,7 @@ Verbatim import commit in this repository: 5ddf473.
 | tests/test_profiles.py | new | | |
 | tests/acceptance/empty/README.md | new (section 11.4) | | |
 | tests/test_cli.py | new (preflight idea from tests/test_native_preparation.py L79) | | |
-| worker_sandbox/__main__.py | new (modeled on benchkit/__main__.py: argparse, dispatch, exit codes 0/1/2/130) | | |
+| worker_sandbox/__main__.py | new; stage 2 adds host_spec, runtime_class, setup-rootless and the rootless Codex sandbox setting (modeled on benchkit/__main__.py: argparse, dispatch, exit codes 0/1/2/130) | | |
 | Makefile | Makefile | 1-9 | none |
 | requirements-dev.txt | requirements-dev.txt | 1-2 | step 8: dropped jsonschema==4.26.0 (no schema check is carried; section 5) |
 | .gitignore | .gitignore | 1-13 | added /verification/, /runs/, /sandbox-runs/ |

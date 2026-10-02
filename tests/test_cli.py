@@ -188,6 +188,14 @@ class RunTests(unittest.TestCase):
         self.assertFalse(authentication)
         self.assertEqual(home_dir, Path('relative-home').absolute())
 
+    def test_rootless_codex_runs_without_its_own_sandbox_and_root_mode_is_unchanged(self):
+        self.run_cli()
+        self.assertNotIn('sandbox_mode="danger-full-access"', self.fake.invocations[-1].argv)
+        rootless_spec = msgspec.structs.replace(self.spec, mode='rootless', subuid_base=100000, subgid_base=100000)
+        with patch('worker_sandbox.__main__.hostconfig.read', return_value=rootless_spec):
+            self.run_cli('--', '--flag')
+        self.assertEqual(self.fake.invocations[-1].argv[-4:], ('-', '-c', 'sandbox_mode="danger-full-access"', '--flag'))
+
     def test_extra_argv_is_appended_once(self):
         self.run_cli('--', '--flag')
         agent = self.fake.invocations[-1]

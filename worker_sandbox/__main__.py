@@ -23,6 +23,9 @@ from .seed import seed_repository
 PROFILES = {'codex': profiles.codex, 'claude': profiles.claude, 'generic': profiles.generic}
 # Diagnostic observer timeout passed to the doctor; not a limit on agent execution.
 DOCTOR_TIMEOUT = 120
+# Rootless mode only: AppArmor's unpriv_bwrap child profile stops an agent's own bubblewrap sandbox from starting
+# inside ours, so Codex runs without it and worker-sandbox is the only boundary (as with Claude Code's skipped prompts).
+ROOTLESS_EXTRA = {'codex': ('-c', 'sandbox_mode="danger-full-access"')}
 
 
 def _tool(name: str):
@@ -154,7 +157,8 @@ def execute(runtime, spec, run: Path, profile: profiles.AgentProfile, args, prom
         return failed, None
     runtime.start_run()
     name = 'bk-' + uuid.uuid4().hex
-    argv = profile.command(model=args.model, effort=args.effort, resume=args.resume, extra=tuple(args.extra))
+    extra = (ROOTLESS_EXTRA.get(profile.name, ()) if spec.mode == 'rootless' else ()) + tuple(args.extra)
+    argv = profile.command(model=args.model, effort=args.effort, resume=args.resume, extra=extra)
     request = c.make(c.RuntimeRequest, spec=spec, name=name, workspace=str(run / 'workspace'),
                      home=str(run / 'home'), argv=argv, log_dir=str(run / 'raw' / name), stdin=prompt)
     cancelled = []
