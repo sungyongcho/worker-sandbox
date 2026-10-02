@@ -15,7 +15,7 @@ import tarfile
 import tempfile
 from io import BytesIO
 
-RUN_DIRECTORIES = ('workspace', 'homes', 'homes/swe', 'tmp')
+RUN_DIRECTORIES = ('workspace', 'home', 'tmp')
 EXCLUDED = {'.git', '.venv', 'venv', 'node_modules', '__pycache__', '.pytest_cache', '.mypy_cache', '.ruff_cache'}
 CHUNK_BYTES = 65536
 

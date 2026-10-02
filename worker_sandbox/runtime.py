@@ -81,7 +81,7 @@ def checked_command(argv: list[str], *, data=None, timeout=30) -> bytes:
 
 class NativeRuntime:
     """Owns the worker filesystem and systemd units; never reads or writes run DBs."""
-    def __init__(self, spec: RuntimeSpec, run: Path, *, authentication=True, profile=()):
+    def __init__(self, spec: RuntimeSpec, run: Path, *, authentication=True, profile=(), path_prefix: str | None = None):
         self.spec = validate(spec, RuntimeSpec)
         self.run = Path(run).absolute()
         if not re.fullmatch('[0-9a-f]{32}', self.run.name):
@@ -94,6 +94,7 @@ class NativeRuntime:
         self.service_active = False
         self.authentication = authentication
         self.profile = tuple(validate(ref, ArtifactRef) for ref in profile)
+        self.spec_path_prefix = path_prefix
 
     def bind_units(self, identity):
         self.run_unit = 'bk-' + identity
@@ -167,7 +168,7 @@ class NativeRuntime:
         try:
             account = pwd.getpwnam(self.spec.account)
         except KeyError as exc:
-            raise ContractError("food-delivery account is not provisioned") from exc
+            raise ContractError(f"{self.spec.account} account is not provisioned") from exc
         if account.pw_uid in {0, os.getuid()} or account.pw_shell not in {'/usr/sbin/nologin', '/sbin/nologin'}:
             raise ContractError('worker requires a distinct, non-login account')
         if account.pw_gid != grp.getgrnam(self.spec.account).gr_gid or account.pw_gid == os.getgid():
@@ -183,11 +184,11 @@ class NativeRuntime:
         if int(version) < 250:
             raise ContractError('systemd >=250 is required for cgroup lifetime tracking')
         return {'account': self.spec.account, 'uid': account.pw_uid, 'systemd': version,
-                'runtime_digest': digest(self.spec), 'disk_hard_quota': False}
+                'runtime_digest': digest(self.spec)}
 
     @staticmethod
-    def verify_model(model):
-        binary = Path(model.binary).resolve(strict=True)
+    def verify_model(binary: str, binary_digest: str | None):
+        binary = Path(binary).resolve(strict=True)
         if not binary.is_file() or not os.access(binary, os.X_OK):
             raise ContractError('native binary must be an executable file')
         for path in (binary, *binary.parents):
@@ -196,7 +197,7 @@ class NativeRuntime:
                 raise ContractError('native installation must be root-owned and not group/world writable')
         with binary.open('rb') as stream:
             identity = 'sha256:' + hashlib.file_digest(stream, 'sha256').hexdigest()
-        if identity != model.binary_digest:
+        if binary_digest is not None and identity != binary_digest:
             raise ContractError('native executable differs from frozen binary digest')
         return identity
 
@@ -205,7 +206,7 @@ class NativeRuntime:
         with exclusive(self.control / 'owner.lock'):
             if self.lease.exists():
                 if loads(safe_read(self.lease, self.control), dict) != {'run': str(self.run)}:
-                    raise ContractError('food-delivery is leased by another run; finish or recover it first')
+                    raise ContractError(f'{self.spec.account} is leased by another run; finish or recover it first')
                 self.rpc('check')
                 return
             if not self.confirm_stopped():
@@ -286,7 +287,7 @@ class NativeRuntime:
         self.put('worker_service.py', Path(worker_service.__file__).read_bytes())
         self.rpc('service_directories')
         request = make(RuntimeRequest, spec=self.spec, name=self.run_unit,
-                       workspace=str(self.run / 'workspace'), home=str(self.run / 'homes/swe'),
+                       workspace=str(self.run / 'workspace'), home=str(self.run / 'home'),
                        argv=(self.spec.python,), log_dir=str(self.run / 'raw'))
         command = self.service_command(request, self.remote, read_only=read_only)
         # Use the same namespace policy with the run supervisor as its entrypoint.
@@ -371,9 +372,9 @@ class NativeRuntime:
     def _job(self, request):
         if not request.argv or not Path(request.argv[0]).is_absolute():
             raise ContractError('absolute native binary required')
-        if Path(request.home) != self.run / 'homes/swe' or Path(request.workspace) != self.run / 'workspace':
+        if Path(request.home) != self.run / 'home' or Path(request.workspace) != self.run / 'workspace':
             raise ContractError('native request paths belong to another run or role')
-        home = self.worker_path('homes/swe')
+        home = self.worker_path('home')
         workspace = self.worker_path('workspace')
         environment = {**control_environment(), 'PATH': '/opt/benchkit-python/bin:/usr/local/bin:/usr/bin:/bin',
                        **native_home(home), 'TMPDIR': self.worker_path('tmp')}

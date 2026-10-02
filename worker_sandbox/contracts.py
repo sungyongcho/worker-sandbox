@@ -50,11 +50,14 @@ class ArtifactRef(Model):
 
 
 class RuntimeSpec(Model):
-    account: Literal["food-delivery"] = "food-delivery"
-    worker_root: Literal["/var/lib/benchkit-worker"] = "/var/lib/benchkit-worker"
-    control_root: Literal["/var/lib/benchkit-controller"] = "/var/lib/benchkit-controller"
-    python: Literal["/usr/bin/python3"] = "/usr/bin/python3"
-    workspace_storage: Literal["host_directory_no_hard_quota"] = "host_directory_no_hard_quota"
+    account: Annotated[str, msgspec.Meta(pattern=r"^[a-z_][a-z0-9_-]{0,31}$")] = "worker-sandbox"
+    worker_root: Text = "/var/lib/worker-sandbox-worker"
+    control_root: Text = "/var/lib/worker-sandbox-controller"
+    python: Text = "/usr/bin/python3"
+
+    def __post_init__(self):
+        if any(not path.startswith("/") or "\x00" in path for path in (self.worker_root, self.control_root, self.python)):
+            raise ValueError("the worker root, control root and python must be absolute paths")
 
 
 class Interval(Model):

@@ -32,6 +32,10 @@ Verbatim import commit in this repository: 5ddf473.
 - step 3: Interval.kind Literal['active', 'native', 'jev', 'setup'] -> Literal['native', 'setup']
 - step 3: make: deleted the two-line `if issubclass(cls, Document):` block (L577-579 with its body)
 - step 3: blank lines between the joined ranges normalized to two
+- step 6: RuntimeSpec.account: Literal["food-delivery"] -> Annotated[str, msgspec.Meta(pattern=r"^[a-z_][a-z0-9_-]{0,31}$")] = "worker-sandbox"
+- step 6: RuntimeSpec.worker_root -> Text = "/var/lib/worker-sandbox-worker"; control_root -> Text = "/var/lib/worker-sandbox-controller"; python -> Text = "/usr/bin/python3"
+- step 6: RuntimeSpec: deleted workspace_storage (L89)
+- step 6: RuntimeSpec: added __post_init__ refusing non-absolute or NUL-containing worker_root, control_root and python, modeled on NativeSpec.__post_init__ (L102-106)
 
 ## runtime.py
 - step 4: L20 import: dropped payment_gateway
@@ -54,12 +58,19 @@ Verbatim import commit in this repository: 5ddf473.
 - step 5: deleted observe_workspace (L489-490) with its trailing blank line
 - step 5: release: deleted L631-632 (credential release) and L643-644 (vault forget)
 - step 5: deleted _release_credentials (L647-661) with the blank line before it
+- step 6: __init__ (L112): added keyword `path_prefix: str | None = None`; inserted `self.spec_path_prefix = path_prefix` after L127 (section 6.7, _job)
+- step 6: inspect L214: "food-delivery account is not provisioned" -> f"{self.spec.account} account is not provisioned"
+- step 6: inspect L230: deleted 'disk_hard_quota': False from the returned dict
+- step 6: verify_model L233-234, L243: takes (binary: str, binary_digest: str | None); Path(model.binary) -> Path(binary); the digest comparison runs only when binary_digest is not None
+- step 6: claim L252: 'food-delivery is leased by another run; ...' -> f'{self.spec.account} is leased by another run; ...'
+- step 6: start_run L385, _job L535 and L537: homes/swe -> home
 
 ## worker_files.py
 - step 4: service_directories (L487): ('jobs', 'payment') -> ('jobs',)
 - step 4: deleted the payment_requests action (L490-492)
 - step 5: dispatch: deleted the reset (L465-478), file_identity (L493-501), observe_workspace (L502-503), session_evidence (L504-519) and native_evidence (L520-531) actions
 - step 5: list (L588): `if relative not in {'workspace', 'grade-env'}:` -> `if relative != 'workspace':`
+- step 6: RUN_DIRECTORIES (L18): ('workspace', 'homes', 'homes/swe', 'tmp') -> ('workspace', 'home', 'tmp')
 - step 5: no import became unused (the architecture check run against worker_sandbox reports none for this file; `re` is still used at L216)
 
 ## worker_service.py

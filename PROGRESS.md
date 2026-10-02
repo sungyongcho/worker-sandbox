@@ -6,12 +6,12 @@ Repository: <worker-sandbox>
 Import commit: 5ddf473
 
 ## State
-- Current step: 6 Parameterize
+- Current step: 7 Profiles and host config
 - Status: in progress
-- Last commit: this commit refactor: remove evidence archiving and the credential vault
+- Last commit: this commit refactor: parameterize the account, roots and agent home
 - Working tree: clean
 - Offline suite: 2 passed, 2 import errors (tests still import benchkit until step 8) at this commit; run from the repository root with .venv/bin/python -I -B -m unittest discover -s tests
-- Next action: apply the step 6 edits: RuntimeSpec fields and __post_init__ (6.1), homes/swe -> home in runtime.py and worker_files.py, inspect and claim messages, disk_hard_quota, verify_model signature, path_prefix keyword
+- Next action: write profiles.py and hostconfig.py, apply the 6.7 __init__ signature, native_home deletion, seed_native_state body and _job environment hunks, delete the credentials import, then delete exactly the unused imports the architecture check names
 - Blocked on: none
 
 ## Step log
@@ -21,9 +21,9 @@ Import commit: 5ddf473
 | 2 Verbatim import | done | 5ddf473 | import commit holds only the copies (R1); its hash is recorded in a following docs commit |
 | 3 Contracts subset | done | 8881c72 | |
 | 4 Remove the payment fixture | done | ffae987 | |
-| 5 Remove evidence and vault features | done | this commit | |
-| 6 Parameterize | in progress | | |
-| 7 Profiles and host config | pending | | |
+| 5 Remove evidence and vault features | done | b9aa4bc | |
+| 6 Parameterize | done | this commit | |
+| 7 Profiles and host config | in progress | | |
 | 8 Tests | pending | | |
 | 9 CLI | pending | | |
 | 10 Doctor | pending | | owner present for sudo -v |
