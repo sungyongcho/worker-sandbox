@@ -47,21 +47,21 @@ Brief: <worker-benchmark>/SANDBOX_STAGE2_HANDOFF.md
 Base commit: bd84174
 
 ### State
-- Current step: 3 Contracts
+- Current step: 4 Rootless runtime
 - Status: in progress
-- Last commit: this commit test: add the rootless reference probe
+- Last commit: this commit feat: add rootless fields to the runtime spec
 - Working tree: clean
-- Offline suite: 101 passed at 66b9329 (stage 1)
-- Next action: add mode, subuid_base, subgid_base to RuntimeSpec (5.1) with tests
+- Offline suite: 104 passed at this commit
+- Next action: write worker_sandbox/rootless.py (5.2) and rootless_init.py (5.3) with tests/test_rootless.py argv, rules and state tests
 - Blocked on: none
 
 ### Step log
 | Step | Status | Commit | Note |
 | --- | --- | --- | --- |
 | 1 Record the start | done | 1782c85 | owner approved starting stage 2 and running the doctor and live acceptance directly |
-| 2 Reproduce M8 | done | this commit | m8 and runtime variants passed; /run needs the resolver bound at the symlink target | |
-| 3 Contracts | in progress | | |
-| 4 Rootless runtime | pending | | |
+| 2 Reproduce M8 | done | 8603228 | m8 and runtime variants passed; /run needs the resolver bound at the symlink target | |
+| 3 Contracts | done | this commit | stage 1 host.json byte test now compares the decoded spec | |
+| 4 Rootless runtime | in progress | | |
 | 5 CLI and provisioning | pending | | |
 | 6 Doctor mode | pending | | |
 | 7 Live acceptance | pending | | |

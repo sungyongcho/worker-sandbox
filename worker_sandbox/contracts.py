@@ -54,10 +54,15 @@ class RuntimeSpec(Model):
     worker_root: Text = "/var/lib/worker-sandbox-worker"
     control_root: Text = "/var/lib/worker-sandbox-controller"
     python: Text = "/usr/bin/python3"
+    mode: Literal["root", "rootless"] = "root"
+    subuid_base: Nonnegative | None = None
+    subgid_base: Nonnegative | None = None
 
     def __post_init__(self):
         if any(not path.startswith("/") or "\x00" in path for path in (self.worker_root, self.control_root, self.python)):
             raise ValueError("the worker root, control root and python must be absolute paths")
+        if self.mode == "rootless" and (self.subuid_base is None or self.subgid_base is None):
+            raise ValueError("rootless mode requires the subordinate uid and gid bases")
 
 
 class Interval(Model):

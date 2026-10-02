@@ -245,8 +245,9 @@ class HostConfigTests(unittest.TestCase):
             control.mkdir(mode=0o700)
             spec = c.RuntimeSpec(account='sandbox-a', worker_root='/var/lib/a', control_root=str(control),
                                  python='/opt/python3')
-            self.assertEqual(setup_host.host_document('sandbox-a', Path('/var/lib/a'), control, '/opt/python3'),
-                             c.dumps(spec))
+            # Root-mode host.json omits the stage 2 fields; they read back as their root-mode defaults.
+            self.assertEqual(c.loads(setup_host.host_document('sandbox-a', Path('/var/lib/a'), control, '/opt/python3'),
+                                     c.RuntimeSpec), spec)
             with patch.object(setup_host.pwd, 'getpwnam', return_value=pwd.getpwuid(os.getuid())), \
                  contextlib.redirect_stdout(io.StringIO()):
                 target = setup_host.write_host('owner', 'sandbox-a', Path('/var/lib/a'), control, '/opt/python3')

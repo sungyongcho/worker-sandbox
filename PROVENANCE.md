@@ -48,6 +48,7 @@ Verbatim import commit in this repository: 5ddf473.
 - step 6: RuntimeSpec.worker_root -> Text = "/var/lib/worker-sandbox-worker"; control_root -> Text = "/var/lib/worker-sandbox-controller"; python -> Text = "/usr/bin/python3"
 - step 6: RuntimeSpec: deleted workspace_storage (L89)
 - step 6: RuntimeSpec: added __post_init__ refusing non-absolute or NUL-containing worker_root, control_root and python, modeled on NativeSpec.__post_init__ (L102-106)
+- stage 2 step 3: RuntimeSpec gains mode ("root" | "rootless", default "root"), subuid_base and subgid_base (Nonnegative | None); __post_init__ requires both bases in rootless mode
 
 ## runtime.py
 - step 4: L20 import: dropped payment_gateway

@@ -215,3 +215,11 @@ Deviation needed for section 4.1's `--tmpfs /run --remount-ro /run`: on this hos
 /etc/resolv.conf". Did instead: bind the sandbox resolver at the symlink's target inside the new /run tmpfs
 (`--tmpfs /run --ro-bind <resolv.conf> <realpath of /etc/resolv.conf> --remount-ro /run`), falling back to
 /etc/resolv.conf when it does not point into /run. The runtime uses the same order.
+
+## 2026-10-02 worker_sandbox/contracts.py:57 (stage 2 step 3)
+Expected: "`RuntimeSpec` gains ... defaults that keep every existing `host.json` valid" (stage 2, 5.1); tools/setup_host.py unchanged (5.6).
+Observed: existing host.json files stay valid (the provisioned root-mode file reads back with mode 'root'), but
+contracts.dumps(RuntimeSpec) now includes mode, subuid_base and subgid_base, so the stage 1 test that pinned
+setup_host.host_document to the exact dumps bytes failed.
+Did instead: tests/test_cli.py HostConfigTests now asserts that setup_host's bytes load to the same RuntimeSpec; setup_host.py unchanged.
+inspect()'s informational runtime_digest changes value for root mode because the digest covers the new fields.
