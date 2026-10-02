@@ -6,12 +6,12 @@ Repository: <worker-sandbox>
 Import commit: 5ddf473
 
 ## State
-- Current step: 4 Remove the payment fixture
+- Current step: 5 Remove evidence and vault features
 - Status: in progress
-- Last commit: this commit refactor: keep only the runtime contracts
+- Last commit: this commit refactor: remove the payment fixture from the run service
 - Working tree: clean
 - Offline suite: 2 passed, 2 import errors (tests still import benchkit until step 8) at this commit; run from the repository root with .venv/bin/python -I -B -m unittest discover -s tests
-- Next action: read the payment hunks of runtime.py, worker_files.py and worker_service.py, apply the section 12 step 4 deletions only, record them, run the suite
+- Next action: apply the remaining section 6.7, 6.4 and 6.2 deletions (evidence, vault, reset, scan) to runtime.py, worker_files.py and artifacts.py; leave unused-import removal in runtime.py to step 7
 - Blocked on: none
 
 ## Step log
@@ -19,9 +19,9 @@ Import commit: 5ddf473
 | --- | --- | --- | --- |
 | 1 Scaffold | done | d6b35ec | |
 | 2 Verbatim import | done | 5ddf473 | import commit holds only the copies (R1); its hash is recorded in a following docs commit |
-| 3 Contracts subset | done | this commit | |
-| 4 Remove the payment fixture | in progress | | |
-| 5 Remove evidence and vault features | pending | | |
+| 3 Contracts subset | done | 8881c72 | |
+| 4 Remove the payment fixture | done | this commit | |
+| 5 Remove evidence and vault features | in progress | | |
 | 6 Parameterize | pending | | |
 | 7 Profiles and host config | pending | | |
 | 8 Tests | pending | | |

@@ -9,10 +9,7 @@ import time
 
 def serve(root: Path):
     children, launched = [], set()
-    gateway = subprocess.Popen([sys.executable, '-I', str(root / 'payment_gateway.py'), str(root / 'payment'), '18765'])
     while True:
-        if gateway.poll() is not None:
-            raise RuntimeError(f'Payment gateway exited: {gateway.returncode}')
         for folder in sorted((root / 'jobs').iterdir()):
             request = folder / 'request.json'
             if folder.name in launched or not (folder / 'ready').is_file():

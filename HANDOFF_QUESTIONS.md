@@ -25,3 +25,8 @@ together with the inspect and claim messages that depend on them. The final diff
 Expected: "Model it on `NativeSpec.__post_init__` (L44-48)" (section 6.1).
 Observed: at 8bb76be, NativeSpec.__post_init__ is at L102-106; L44-48 is Halt.__init__.
 Did instead: used L102-106 as the model (applied in step 6).
+
+## 2026-10-02 worker_sandbox/runtime.py:358
+Expected: "Docstring L359-362: delete the second sentence about the payment ledger; keep the first" (section 6.7).
+Observed: the docstring opens on L358; L359 is blank, L360-361 hold the second sentence, L362 closes it.
+Did instead: kept L358 with closing quotes added, deleted L359-362. Same meaning, one line earlier.

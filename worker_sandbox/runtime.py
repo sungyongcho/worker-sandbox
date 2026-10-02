@@ -17,13 +17,12 @@ import threading
 import time
 import uuid
 
-from . import worker_files, worker_job, worker_service, seed, payment_gateway
+from . import worker_files, worker_job, worker_service, seed
 from .adapters import EVIDENCE_DIRECTORIES, auth_command
 from .artifacts import atomic_output, atomic_write, reference_file, replace_directory, safe_open, safe_read, tree_manifest
 from .contracts import ArtifactRef, ContractError, Halt, Interval, NativeSpec, RuntimeRequest, RuntimeResult, RuntimeSpec, digest, dumps, loads, make, validate
 from .credentials import AUTH_FILE, AccountMismatch, CredentialVault, MalformedCredentials, identity, LIMIT, normalize
 from .ownership import exclusive
-from .payment_fixture import PaymentFixture
 from .secrets import credential_secrets, unparsed_secrets, verify_no_known_secret
 
 _UNIT = re.compile(r'bk-[0-9a-f]{32}')
@@ -120,12 +119,8 @@ class NativeRuntime:
         self.bind_units(self.run.name)
         self.starts = 0
         self.service_active = False
-        self.payment_url = None
-        self.payment = None
-        self.handled_payments = set()
         self.authentication = authentication
         self.profile = tuple(validate(ref, ArtifactRef) for ref in profile)
-        self.payment_lock = threading.Lock()
 
     def bind_units(self, identity):
         self.run_unit = 'bk-' + identity
@@ -355,11 +350,7 @@ class NativeRuntime:
             raise ContractError("worker seed changed before execution")
 
     def start_run(self, evidence=None, *, read_only=()):
-        """One service supplies mount/tmp/IPC/process lifetime for all native turns.
-
-        A restart after a confirmed stop gets new unit names, and its payment ledger and
-        resolver go under the given local evidence folder, so no earlier start's files collide.
-        """
+        """One service supplies mount/tmp/IPC/process lifetime for all native turns."""
         if self.service_active:
             raise ContractError('Run service already started')
         if not Path('/usr/bin/slirp4netns').is_file():
@@ -368,9 +359,6 @@ class NativeRuntime:
         if self.starts:
             self.bind_units(hashlib.md5(f'{self.run.name}:{self.starts}'.encode(), usedforsecurity=False).hexdigest())
         self.starts += 1
-        self.payment_url = 'http://127.0.0.1:18765'
-        self.payment = PaymentFixture(evidence / 'artifacts/payment-ledger.sqlite3', self.run.name)
-        self.handled_payments = set()
         self.put('resolv.conf', b'nameserver 10.0.2.3\n')
         upstream = evidence / 'artifacts/upstream-resolv.conf'
         # Controller-owned, nonsecret input; slirp drops DAC override capabilities.
@@ -379,7 +367,6 @@ class NativeRuntime:
             os.fchmod(stream.fileno(), 0o444)
         self.put('worker_job.py', Path(worker_job.__file__).read_bytes())
         self.put('worker_service.py', Path(worker_service.__file__).read_bytes())
-        self.put('payment_gateway.py', Path(payment_gateway.__file__).read_bytes())
         self.rpc('service_directories')
         request = make(RuntimeRequest, spec=self.spec, name=self.run_unit,
                        workspace=str(self.run / 'workspace'), home=str(self.run / 'homes/swe'),
@@ -407,24 +394,6 @@ class NativeRuntime:
                    self.spec.python, '-I', '-c', NETWORK_BROKER,
                    '/usr/bin/slirp4netns', '--configure', '--disable-host-loopback', '--enable-sandbox', '--enable-seccomp', pid, 'tap0']
         checked_command(command, timeout=35)
-
-    def handle_payments(self):
-        with self.payment_lock:
-            self._handle_payments()
-
-    def _handle_payments(self):
-        if self.payment is None:
-            return
-        for identity in self.rpc('payment_requests'):
-            if identity in self.handled_payments:
-                continue
-            request = loads(self.read('payment/' + identity + '/request.json'), dict)
-            if set(request) != {'path', 'body'} or request['path'] not in {'/charge', '/refund'}:
-                raise ContractError('Invalid payment gateway operation')
-            status, body = self.payment.request(request['path'], request['body'])
-            self.put('payment/' + identity + '/response.json', dumps({'status': status, 'body': body}))
-            self.handled_payments.add(identity)
-
 
     def stop_run(self):
         native = self.cleanup(self.run_unit)
@@ -538,8 +507,6 @@ class NativeRuntime:
         workspace = self.worker_path('workspace')
         environment = {**control_environment(), 'PATH': '/opt/benchkit-python/bin:/usr/local/bin:/usr/bin:/bin',
                        **native_home(home), 'TMPDIR': self.worker_path('tmp')}
-        if self.service_active:
-            environment['PAYMENT_PROVIDER_URL'] = self.payment_url
         job = {'argv': request.argv, 'workspace': workspace, 'environment': environment,
                'host_mount_namespace': os.readlink('/proc/self/ns/mnt'),
                'protected_paths': [str(Path.home()), str(self.control), str(self.run), '/run/user'],
@@ -555,8 +522,6 @@ class NativeRuntime:
         while True:
             if cancel is not None and cancel():
                 return {'outcome': 'cancelled', 'exit_code': None, 'error': 'owner cancelled'}
-            if self.service_active:
-                self.handle_payments()
             status = self.rpc('status', path=relative)
             if status['result'] is not None:
                 return status['result']

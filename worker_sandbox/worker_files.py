@@ -484,12 +484,9 @@ def dispatch(root: Path, request: dict):
         exec(request['script'], namespace)
         return namespace['seed_repository'](root / 'workspace', request['expected'])
     if action == 'service_directories':
-        for relative in ('jobs', 'payment'):
+        for relative in ('jobs',):
             (root / relative).mkdir(mode=0o700, exist_ok=True)
         return True
-    if action == 'payment_requests':
-        return [p.name for p in sorted((root / 'payment').iterdir()) if re.fullmatch('[0-9a-f]{32}', p.name)
-                and not p.is_symlink() and (p / 'request.json').is_file()]
     if action == 'file_identity':
         try:
             descriptor = open_file(root, request['path'], os.O_RDONLY)
