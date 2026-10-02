@@ -137,3 +137,16 @@ Expected: a failed preflight stops "with outcome `provider_error`" (6.9 step 5);
 session_id, result, stdout, stderr (6.9 step 9, section 9).
 Did instead: result.json carries the preflight RuntimeResult with outcome set to provider_error (error text kept, or
 "login status exited with N"), session_id null, and stdout/stderr pointing at the status job's logs. No extra key was added.
+
+# Owner decisions (2026-10-02)
+- tools/setup_host.py:53: approved; setup_host stays standard-library only and writes host.json itself.
+- worker_sandbox/__main__.py:28: approved; tools/ is checkout-only, stated in the README; moving it into the package is a stage 2 item.
+- worker_sandbox/__main__.py:39: approved; the section 11.4 login commands take --binary.
+- worker_sandbox/hostconfig.py:13: stage 1 supports only the default control root; stated in the README.
+- worker_sandbox/runtime.py:109: the 'native_evidence' member of rpc stays as it is.
+- Every other entry above: approved.
+- Host provisioned by the owner: account worker-sandbox (uid 994), /var/lib/worker-sandbox-worker,
+  /var/lib/worker-sandbox-controller/host.json, /usr/local/lib/worker-sandbox-claude/2.1.286/claude (root-owned;
+  `--version` printed 2.1.286 from an empty HOME).
+- Live steps 10 and 11: this session has no sudo. The agent commits code and gives one exact command per line; the
+  owner runs it after `sudo -v` and reports the report path; the agent reads and judges it, then gives the next command.
