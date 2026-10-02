@@ -7,12 +7,12 @@ Import commit: 5ddf473
 
 ## State
 - Current step: 10 Doctor
-- Status: in progress
-- Last commit: this commit feat: add the worker-sandbox command line
+- Status: blocked
+- Last commit: b43a79e feat: add the worker-sandbox command line
 - Working tree: clean
-- Offline suite: 99 passed at this commit; verify_package passed: verification/package-20261002T070822Z.json
+- Offline suite: 99 passed at b43a79e; verify_package passed: verification/package-20261002T070822Z.json
 - Next action: wait for the owner to provision the host (section 11.2) and run sudo -v; then apply section 6.11 to tools/doctor.py (verify(report_path, timeout, profile, *, check_binary)) and run it live with the owner present
-- Blocked on: none
+- Blocked on: owner: provision the host (section 11.2: setup_host.py and the root-owned Claude copy), review HANDOFF_QUESTIONS.md, then run sudo -v in the terminal used for step 10
 
 ## Step log
 | Step | Status | Commit | Note |
@@ -25,8 +25,8 @@ Import commit: 5ddf473
 | 6 Parameterize | done | 17f7f42 | |
 | 7 Profiles and host config | done | 934adfa | |
 | 8 Tests | done | c92e17f | 6.12 verify_package edits included | |
-| 9 CLI | done | this commit | setup_host 6.10 and tests 877, 902 included | |
-| 10 Doctor | pending | | owner present for sudo -v |
+| 9 CLI | done | b43a79e | setup_host 6.10 and tests 877, 902 included | |
+| 10 Doctor | blocked | | owner present for sudo -v |
 | 11 Live acceptance | pending | | owner present |
 | 12 README | pending | | |
 | 13 Provenance final pass | pending | | |
