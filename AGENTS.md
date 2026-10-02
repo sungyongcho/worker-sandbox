@@ -11,5 +11,6 @@
   Do not run them without the owner present.
 - Commits are one-line Conventional Commits in English with no attribution
   trailers. Code, comments and documentation are in English.
-- PROGRESS.md is the single record of where work stands. A session that starts
-  or resumes reads it before anything else and updates it in every commit.
+- docs/history/ holds the extraction record: docs/history/PROGRESS.md is where
+  the staged work stands, docs/history/HANDOFF_QUESTIONS.md every deviation and
+  owner decision. A session that resumes staged work reads PROGRESS.md first.

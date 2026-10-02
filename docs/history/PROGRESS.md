@@ -1,8 +1,8 @@
 # Progress
 
-Brief: <worker-benchmark>/SANDBOX_STAGE1_HANDOFF.md
-Start prompt: <worker-benchmark>/SANDBOX_STAGE1_START_PROMPT.md
-Repository: <worker-sandbox>
+Brief: the stage 1 brief (in the author's private benchmark repository)
+Start prompt: the stage 1 start prompt (in the author's private benchmark repository)
+Repository: <private>/worker-sandbox
 Import commit: 5ddf473
 
 ## State
@@ -11,7 +11,7 @@ Import commit: 5ddf473
 - Last commit: f682ecc docs: complete the provenance record
 - Working tree: clean
 - Offline suite: 101 passed at f682ecc; verify_package passed: verification/package-20261002T083950Z.json
-- Next action: none in stage 1; the owner chooses the license, adds a remote, and corrects brief sections 7.2, 9 and 11.4 in worker-benchmark
+- Next action: none in stage 1; the owner chooses the license, adds a remote, and corrects brief sections 7.2, 9 and 11.4 in the author's private benchmark repository
 - Blocked on: none
 
 ## Step log
@@ -33,7 +33,7 @@ Import commit: 5ddf473
 
 ## Resume checklist
 1. Read this file, then the brief in full.
-2. `git -C <worker-sandbox> status --short` and `git -C <worker-sandbox> log --oneline -20`.
+2. `git -C <private>/worker-sandbox status --short` and `git -C <private>/worker-sandbox log --oneline -20`.
 3. Every step marked done must have its commit hash in the log; if not, the
    record is wrong: fix the record, never redo the step blindly.
 4. If the working tree is dirty, diff it against the enumerated edits of the
@@ -43,7 +43,7 @@ Import commit: 5ddf473
 
 ## Stage 2
 
-Brief: <worker-benchmark>/SANDBOX_STAGE2_HANDOFF.md
+Brief: the stage 2 brief (in the author's private benchmark repository)
 Base commit: bd84174
 
 ### State

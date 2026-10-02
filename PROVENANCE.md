@@ -1,5 +1,7 @@
 # Provenance
 
+The source repository is private; this record exists for the author's audit trail.
+
 Source: worker-benchmark-kit at commit 8bb76be (private repository).
 Verbatim import commit in this repository: 5ddf473.
 

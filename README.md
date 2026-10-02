@@ -4,9 +4,9 @@ Run one coding-agent CLI invocation (Codex CLI, Claude Code, or any argv) inside
 account-isolated Linux sandbox, and get back its stdout, stderr, exit status and the
 workspace it changed.
 
-This is the run-only sandbox extracted from worker-benchmark-kit. The isolation code is
-carried over as it was verified there; `PROVENANCE.md` maps every carried file to its source
-lines and lists each edit.
+This is the run-only sandbox extracted from worker-benchmark-kit, the author's private
+benchmark repository. The isolation code is carried over as it was verified there;
+`PROVENANCE.md` maps every carried file to its source lines and lists each edit.
 
 ## How it works
 
@@ -303,6 +303,7 @@ When your rootless `host.json` exists, `login`, `run`, `recover` and the doctor 
   and `rootless.py` with `rootless_init.py` for rootless mode).
 - `tools/`: host provisioning, the doctor, the package verifier and `probe_rootless.py`, the
   reference measurement of the rootless chain.
-- `PROVENANCE.md`: source and edits of every carried file. `HANDOFF_QUESTIONS.md`: every
-  deviation from the extraction brief and the owner's decisions.
+- `PROVENANCE.md`: source and edits of every carried file. `docs/history/HANDOFF_QUESTIONS.md`:
+  every deviation from the extraction brief and the owner's decisions. `docs/history/PROGRESS.md`:
+  the staged extraction record.
 - License: MIT (`LICENSE`).

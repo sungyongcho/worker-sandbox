@@ -5,7 +5,7 @@ Expected: "`.gitignore`: the kit's, plus `/verification/` and `/runs/`" (section
 Observed: the AGENTS.md text in section 12.3 also states that `sandbox-runs/` is
 ignored, and `sandbox-runs` is the default `--out` of `run` (section 6.9).
 Did instead: added `/sandbox-runs/` as a third line so AGENTS.md is true.
-Shown by: `git -C <worker-sandbox> check-ignore -v sandbox-runs/`.
+Shown by: `git -C <private>/worker-sandbox check-ignore -v sandbox-runs/`.
 
 ## 2026-10-02 PROVENANCE.md:1
 Expected: `tools/setup_host.py` 60 lines and `tools/verify_host.py` 262 lines (section 4.1).
@@ -199,7 +199,7 @@ acceptance, but section 8 removes the agent HOME, where both agents keep session
 Owner decision: run-to-run resume is not supported in stage 1. No code change. The two 11.4 resume items are closed as
 "not supported by design, not run" (the claude resume above is the evidence; the codex resume was not run). The argv
 position of --resume is covered offline by tests/test_profiles.py. The README states the limitation with its cause.
-Session preservation (evidence_directories) is a later-stage item; the brief is corrected in worker-benchmark after stage 1.
+Session preservation (evidence_directories) is a later-stage item; the brief is corrected in the author's private benchmark repository after stage 1.
 
 # Stage 2
 
@@ -226,7 +226,7 @@ inspect()'s informational runtime_digest changes value for root mode because the
 
 ## 2026-10-02 worker_sandbox/rootless.py:46 worker root default (stage 2 step 4)
 Expected: worker_root default `$XDG_STATE_HOME/worker-sandbox/worker`, owned by the sub-UID (stage 2, 4.3).
-Observed: /home/<user> is 0750 and ~/.local, ~/.local/state are 0700, so host uid 100000 (inner 1000) cannot traverse to
+Observed: ~ is 0750 and ~/.local, ~/.local/state are 0700, so host uid 100000 (inner 1000) cannot traverse to
 anything under HOME; neither the bridge nor bwrap's bind source could reach that worker root. For the same reason the
 4.4 read-only bind of an agent binary under /home cannot work on this host (root-owned copies are unaffected).
 Did instead: default worker_root `/var/tmp/worker-sandbox-<user>/worker`; its parent is controller-owned 0755 and the worker
@@ -327,7 +327,7 @@ anywhere in either unit's stream. No other effect observed.
 Did instead (5.4 / 7.4 enumerated edit): the Claude profile's command() adds `--strict-mcp-config` after
 `--permission-prompts none`; tests/test_profiles.py updated. This applies to root mode too (shared profile).
 
-# Owner decisions (stage 2, 2026-10-02, relayed by the worker-benchmark session)
+# Owner decisions (stage 2, 2026-10-02, relayed by the session working in the author's private benchmark repository)
 - Worker root at /var/tmp/worker-sandbox-<user>/worker: approved, on condition that inspect keeps refusing a worker root
   not owned by the sub-UID base with mode 0700, that a worker root removed by systemd-tmpfiles is either recreated by
   setup-rootless or reported clearly by inspect, and that the README states it.
