@@ -63,23 +63,46 @@ sudo /usr/bin/python3 -I tools/setup_host.py --controller "$(id -un)"
 This creates the `worker-sandbox` account, `/var/lib/worker-sandbox-worker` (worker-owned,
 0700) and `/var/lib/worker-sandbox-controller` (controller-owned, 0700), and records them in
 `/var/lib/worker-sandbox-controller/host.json`. It refuses to touch an existing account or
-path. No sudoers rule, credential or agent is installed.
+path. No sudoers rule, credential or agent is installed. Then install the agents root-owned, as
+described next.
 
-Install the agent root-owned, for example Claude Code:
+## Install the agents root-owned
+
+In root mode the agent executable must be owned by root, in root-owned directories that are not
+group or world writable, so an install under your home directory has to be copied out. Replace
+`<version>` with the installed version.
+
+Claude Code: the native installer keeps each version as a single executable at
+`~/.local/share/claude/versions/<version>`.
 
 ```bash
-sudo mkdir -p /usr/local/lib/worker-sandbox-claude/2.1.286
-sudo cp ~/.local/share/claude/versions/2.1.286 /usr/local/lib/worker-sandbox-claude/2.1.286/claude
-sudo chmod 755 /usr/local/lib/worker-sandbox-claude/2.1.286/claude
+sudo mkdir -p /usr/local/lib/worker-sandbox-claude/<version>
+sudo cp ~/.local/share/claude/versions/<version> /usr/local/lib/worker-sandbox-claude/<version>/claude
+sudo chmod 755 /usr/local/lib/worker-sandbox-claude/<version>/claude
 ```
+
+Codex CLI: where the executable lives depends on how Codex was installed. For example, a
+standalone install on the author's host keeps it at
+`~/.codex/packages/standalone/releases/<version>-<arch>/bin/codex`; an npm global install puts it
+elsewhere. Copy the executable the same way:
+
+```bash
+sudo mkdir -p /usr/local/lib/worker-sandbox-codex/<version>
+sudo cp ~/.codex/packages/standalone/releases/<version>-<arch>/bin/codex /usr/local/lib/worker-sandbox-codex/<version>/codex
+sudo chmod 755 /usr/local/lib/worker-sandbox-codex/<version>/codex
+```
+
+Rootless mode does not require root ownership, but the executable must be readable and executable
+by other users in directories they can traverse; these copies satisfy both modes.
 
 ## Check the host
 
 Run `sudo -v` first, in the same terminal. The doctor creates one synthetic run, executes only
-Python probes (no model call), checks every isolation property live, and removes the run:
+Python probes (no model call), checks every isolation property live, and removes the run.
+Replace `<version>` with the installed version.
 
 ```bash
-.venv/bin/python -B tools/doctor.py --report verification/doctor-$(date -u +%Y%m%dT%H%M%SZ).json --profile claude --binary /usr/local/lib/worker-sandbox-claude/2.1.286/claude
+.venv/bin/python -B tools/doctor.py --report verification/doctor-$(date -u +%Y%m%dT%H%M%SZ).json --profile claude --binary /usr/local/lib/worker-sandbox-claude/<version>/claude
 ```
 
 It passes only when every check passes: private controller files denied, another run's files
@@ -92,11 +115,12 @@ is removed afterwards.
 
 Each agent runs its own login into a private staging HOME under
 `<control root>/credentials/<profile>/`. The tool never opens the files the agent writes; at
-claim it copies only the profile's credential files into the run HOME.
+claim it copies only the profile's credential files into the run HOME. Replace `<version>` with
+the installed version.
 
 ```bash
-worker-sandbox login --profile codex --binary /path/to/root-owned/codex
-worker-sandbox login --profile claude --binary /usr/local/lib/worker-sandbox-claude/2.1.286/claude
+worker-sandbox login --profile codex --binary /usr/local/lib/worker-sandbox-codex/<version>/codex
+worker-sandbox login --profile claude --binary /usr/local/lib/worker-sandbox-claude/<version>/claude
 ```
 
 Login refuses while a run holds the lease. Without `--binary`, the agent is looked up by name on
@@ -104,10 +128,11 @@ Login refuses while a run holds the lease. Without `--binary`, the agent is look
 
 ## Run
 
-The prompt is read from stdin. Run `sudo -v` first, in the same terminal.
+The prompt is read from stdin. Run `sudo -v` first, in the same terminal. Replace `<version>` with
+the installed version.
 
 ```bash
-printf 'Create a file named hello.txt containing the single word hello, then stop.\n' | worker-sandbox run --profile claude --workspace ./project --out ./sandbox-runs --binary /usr/local/lib/worker-sandbox-claude/2.1.286/claude
+printf 'Create a file named hello.txt containing the single word hello, then stop.\n' | worker-sandbox run --profile claude --workspace ./project --out ./sandbox-runs --binary /usr/local/lib/worker-sandbox-claude/<version>/claude
 ```
 
 Options: `--model`, `--effort`, `--resume SESSION_ID`, `--home-dir DIR` (regular files copied
@@ -162,7 +187,7 @@ claude.ai account's remote MCP connectors out of the run. `generic` runs the giv
 
 ## Limitations (root mode)
 
-- Linux only. Requires systemd 250 or later (this host: 259), `sudo` for the
+- Linux only. Requires systemd 250 or later, `sudo` for the
   controller user, root once for `setup-host`, `/usr/bin/slirp4netns`, Python 3.12
   or later for the controller environment and `/usr/bin/python3` for the worker
   bridge.
@@ -235,9 +260,11 @@ Files move across the boundary through the same bridge as root mode, run as inne
 
 ### Set up and check
 
+Replace `<version>` with the installed version.
+
 ```bash
 .venv/bin/worker-sandbox setup-rootless
-.venv/bin/python -B tools/doctor.py --report verification/doctor-rootless-$(date -u +%Y%m%dT%H%M%SZ).json --profile claude --binary /usr/local/lib/worker-sandbox-claude/2.1.286/claude
+.venv/bin/python -B tools/doctor.py --report verification/doctor-rootless-$(date -u +%Y%m%dT%H%M%SZ).json --profile claude --binary /usr/local/lib/worker-sandbox-claude/<version>/claude
 ```
 
 `setup-rootless` reads your sub-UID and sub-GID bases, checks the host binaries and the
