@@ -367,3 +367,12 @@ without its own sandbox in rootless mode, binary reachability). Three stage 1 Li
 were edited: "There is no rootless mode yet ..." now says root mode needs root and the rootless mode does not; the
 control-root line names both default control roots; the connector line says the Claude profile passes
 --strict-mcp-config. The section is now titled "Limitations (root mode)". The Profiles paragraph shows the new flag.
+
+## 2026-10-02 stage 2 close (step 9)
+- worker_sandbox/rootless.py is 358 lines against the "≤ 350" guide of 5.2; the overrun is the unit records and the
+  worker-root repair the owner asked for. Nothing else exceeds its guide.
+- 7.5: the root-mode file diff against bd84174 is empty and tools/setup_host.py is unchanged. Shared code that root mode
+  also runs did change: contracts.py (three defaulted fields), __main__.py (host_spec, runtime_class), tools/doctor.py
+  (mode switch, root fixtures unchanged) and profiles.py (--strict-mcp-config for Claude). Recommendation for the owner:
+  rerun the root-mode doctor and the root-mode Claude acceptance once with sudo (`WORKER_SANDBOX_MODE=root` is needed on
+  this host, because the rootless host.json now takes precedence).

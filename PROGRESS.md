@@ -49,9 +49,9 @@ Base commit: bd84174
 ### State
 - Current step: 9 Provenance and progress
 - Status: in progress
-- Last commit: this commit docs: describe the rootless mode
+- Last commit: this commit docs: complete the stage 2 record
 - Working tree: clean
-- Offline suite: 125 passed at ee1af75
+- Offline suite: 125 passed; verify_package passed: verification/package-20261002T094749Z.json
 - Next action: complete PROVENANCE for stage 2, run the 7.5 root-mode regression diff, final suite and verify_package
 - Blocked on: none
 
@@ -65,5 +65,5 @@ Base commit: bd84174
 | 5 CLI and provisioning | done | dc40420 | host provisioned rootless; rootless host.json preferred when present | |
 | 6 Doctor mode | done | 2ababe6, 31bffdf (fix) | attempt 2 passed: verification/doctor-rootless-20261002T093518Z.json; attempt 1 failed on the worker root parent mode | |
 | 7 Live acceptance | done | 1473ad0, ad6c33a, ee1af75, fdf3871 | codex runs/4d0a5d8c9e3b486890cc6cefc7b1a1b3 and claude runs/8c0a52ba3c514b6aba074ffb72937934 passed; codex needed its own sandbox off (owner decision); --strict-mcp-config added after 7.4 |
-| 8 README | done | this commit | three stage 1 limitation lines updated | |
-| 9 Provenance and progress | in progress | | |
+| 8 README | done | 1db20c0 | three stage 1 limitation lines updated | |
+| 9 Provenance and progress | done | this commit | 7.5 diff empty | |

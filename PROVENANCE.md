@@ -37,6 +37,10 @@ Verbatim import commit in this repository: 5ddf473.
 | HANDOFF_QUESTIONS.md | new (brief section 12.4 format) | | |
 | PROVENANCE.md | new (brief Appendix C) | | |
 | LICENSE | new (MIT, chosen by the owner 2026-10-02; replaced LICENSE.TODO) | | |
+| worker_sandbox/rootless.py | new, stage 2 (subclass of NativeRuntime; brief 5.2 and Appendix A) | | |
+| worker_sandbox/rootless_init.py | new, stage 2 (brief 5.3) | | |
+| tools/probe_rootless.py | new, stage 2 (port of stage 2 brief Appendix A and the /tmp/wsb-probe sources) | | |
+| tests/test_rootless.py | new, stage 2 | | |
 
 ## contracts.py
 - step 3: kept only the section 6.1 subset, copied from the listed source lines in source order
@@ -201,3 +205,26 @@ Command: `git diff 5ddf473 -- worker_sandbox/runtime.py worker_sandbox/worker_fi
 - artifacts.py (143 lines, 4 hunks): shutil import and contracts import (step 5); _snapshot, copy_artifact, snapshot (step 5).
 - contracts.py (159 lines): the section 6.1 subset (step 3) and the RuntimeSpec edits (step 6).
 Every hunk maps to a section 6 entry listed above in this file.
+
+## Stage 2 (rootless mode)
+
+Base commit: bd84174. Brief: worker-benchmark/SANDBOX_STAGE2_HANDOFF.md.
+
+- New files: worker_sandbox/rootless.py (RootlessRuntime(NativeRuntime) overriding __init__, bridge_command, inspect,
+  verify_model, start_run, service_command, state, cleanup, confirm_stopped; plus provisioning, nft rules and unit
+  records), worker_sandbox/rootless_init.py, tools/probe_rootless.py (port of Appendix A), tests/test_rootless.py.
+- contracts.py: RuntimeSpec mode, subuid_base, subgid_base and the rootless check in __post_init__ (5.1).
+- profiles.py: the Claude command adds --strict-mcp-config (7.4 measurement).
+- __main__.py: host_spec, runtime_class, setup-rootless, ROOTLESS_EXTRA for Codex; login, run and recover use
+  host_spec and runtime_class (5.4 and owner decisions).
+- tools/doctor.py: mode switch (5.5), listed under "doctor.py" above.
+- tools/verify_package.py: offline guard extended (5.7), listed under "verify_package.py" above.
+- tests/test_cli.py: rootless selection, setup-rootless, the rootless Codex setting; the stage 1 host.json byte test now
+  compares the decoded spec. tests/test_profiles.py: the Claude argv with --strict-mcp-config.
+
+### Stage 2 audit (step 9)
+`git diff bd84174 -- worker_sandbox/runtime.py worker_sandbox/worker_files.py worker_sandbox/worker_job.py
+worker_sandbox/worker_service.py worker_sandbox/artifacts.py worker_sandbox/seed.py worker_sandbox/ownership.py
+worker_sandbox/hostconfig.py` is empty (7.5); tools/setup_host.py is unchanged (5.6). The only files changed beside the
+new ones are the four S1 enumerates (contracts.py +5, profiles.py one flag, __main__.py, tools/doctor.py), plus tests,
+tools/verify_package.py and the documents.
