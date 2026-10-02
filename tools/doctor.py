@@ -19,9 +19,10 @@ import time
 import uuid
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from worker_sandbox import contracts as c, hostconfig, profiles
+from worker_sandbox import contracts as c, profiles
 import worker_sandbox.runtime
 from worker_sandbox.runtime import NativeRuntime, checked_command
+from worker_sandbox.__main__ import host_spec, runtime_class
 from worker_sandbox.seed import seed_repository
 
 
@@ -46,10 +47,13 @@ def verify(report_path, timeout, profile=None, *, check_binary=False):
         (folder / name).mkdir()
     seed_repository(folder / 'workspace')
     # The diagnostic executes Python probes only, never a native executable or login.
-    spec = hostconfig.read()
-    runtime = NativeRuntime(spec, folder, profile, authentication=False)
-    report = {'status': 'failed', 'model_calls': 0, 'run': str(folder), 'controller_digest': controller_digest(),
-              'profile': profile.name, 'checks': []}
+    spec = host_spec()
+    runtime = runtime_class(spec)(spec, folder, profile, authentication=False)
+    report = {'status': 'failed', 'mode': spec.mode, 'model_calls': 0, 'run': str(folder),
+              'controller_digest': controller_digest(), 'profile': profile.name, 'checks': []}
+    # Same-UID fixtures outside the run: the worker account through sudo, or inner 1000 through the rootless bridge.
+    as_worker = (['/usr/bin/sudo', '-n', '-u', runtime.spec.account, runtime.spec.python, '-I', '-c']
+                 if spec.mode == 'root' else runtime.bridge_command()[:-2])
     deadline = time.monotonic() + timeout
     def invoke(label, source):
         name = 'bk-' + uuid.uuid4().hex
@@ -130,7 +134,7 @@ print('existing same-UID foreign session read/write denied')
             time.sleep(.02)
         else:
             raise RuntimeError('Cross-run probe could not establish its ready barrier')
-        command = ['/usr/bin/sudo', '-n', '-u', runtime.spec.account, runtime.spec.python, '-I', '-c']
+        command = as_worker
         creator = "from pathlib import Path; import sys; p=Path(sys.argv[1]); p.mkdir(mode=0o700); (p/'session.json').write_text(p.name); assert (p/'session.json').read_text()==p.name"
         checked_command([*command, creator, str(sibling)])
         runtime.put('probe-go', b'go')
@@ -165,11 +169,29 @@ print('existing same-UID foreign session read/write denied')
             source = "import socket\nfor host in " + repr(sorted(hosts)) + ":\n with socket.socket() as s:\n  s.settimeout(.5)\n  assert s.connect_ex((host," + str(port) + ")) != 0, ('host service reachable',host)\n"
             invoke('host-network-services-denied', source)
         invoke('internet-tls-port', "import socket; s=socket.create_connection(('api.openai.com',443),timeout=10); s.close()")
-        if check_binary:
-            identity = NativeRuntime.verify_model(profile.binary, None)
-            report['checks'].append({'name': 'agent-binary-root-owned', 'binary': profile.binary, 'digest': identity, 'passed': True})
+        if spec.mode == 'root':
+            if check_binary:
+                identity = NativeRuntime.verify_model(profile.binary, None)
+                report['checks'].append({'name': 'agent-binary-root-owned', 'binary': profile.binary, 'digest': identity, 'passed': True})
+            else:
+                report['checks'].append({'name': 'agent-binary-root-owned', 'skipped': 'no --binary given', 'passed': True})
+        elif check_binary:
+            identity = runtime.verify_model(profile.binary, None)
+            invoke('agent-binary-read-only-in-sandbox', """import os,subprocess
+binary=BINARY
+try:
+ fd=os.open(binary,os.O_WRONLY)
+except OSError as exc:
+ print('write refused:',exc.errno,flush=True)
+else:
+ os.close(fd); raise AssertionError('agent binary writable inside the sandbox')
+version=subprocess.run([binary,'--version'],capture_output=True)
+assert version.returncode==0,version.stderr[-300:]
+print(version.stdout.decode().strip())
+""".replace('BINARY', repr(profile.binary)))
+            report['checks'][-1].update(binary=profile.binary, digest=identity)
         else:
-            report['checks'].append({'name': 'agent-binary-root-owned', 'skipped': 'no --binary given', 'passed': True})
+            report['checks'].append({'name': 'agent-binary-read-only-in-sandbox', 'skipped': 'no --binary given', 'passed': True})
         # Informational: managed agent policy on this host is recorded, never required.
         managed = {path: os.path.exists(path) for path in ('/etc/claude-code/managed-settings.json', '/etc/codex')}
         report['checks'].append({'name': 'managed-settings-present', 'present': managed, 'passed': True})
@@ -183,7 +205,7 @@ print('existing same-UID foreign session read/write denied')
             if not stopped:
                 raise RuntimeError('Stop uncertain; execution space and lease retained')
             if report['status'] == 'passed':
-                other = NativeRuntime(runtime.spec, root / 'runs' / uuid.uuid4().hex, profile, authentication=False)
+                other = runtime_class(spec)(runtime.spec, root / 'runs' / uuid.uuid4().hex, profile, authentication=False)
                 (other.run / 'workspace').mkdir(parents=True)
                 try:
                     other.claim()
@@ -195,7 +217,7 @@ print('existing same-UID foreign session read/write denied')
                     raise RuntimeError('Another run was admitted before prior removal')
                 sibling = runtime.remote.parent / ('probe-' + uuid.uuid4().hex)
                 creator = "from pathlib import Path; import sys; p=Path(sys.argv[1]); p.mkdir(mode=0o700); (p/'marker').write_text(p.name)"
-                command = ['/usr/bin/sudo', '-n', '-u', runtime.spec.account, runtime.spec.python, '-I', '-c']
+                command = as_worker
                 checked_command([*command, creator, str(sibling)])
                 try:
                     runtime.claim()

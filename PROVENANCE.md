@@ -168,6 +168,10 @@ Verbatim import commit in this repository: 5ddf473.
 - step 10: added checks agent-binary-root-owned (verify_model(profile.binary, None); skipped without --binary) and managed-settings-present (informational) after the existing checks
 - step 10: literals: temporary prefix benchkit-host-check- -> worker-sandbox-host-check-; private-grader-canary -> private-controller-canary; benchkit-write-probe -> worker-sandbox-write-probe; module docstring no longer names Codex-only endpoints or Jev
 - step 10: main gains --profile and --binary
+- stage 2 step 6: spec from host_spec() and the runtime from runtime_class(spec); report gains top-level 'mode'
+- stage 2 step 6: the same-UID fixtures (cross-run sibling, residue) use sudo -u in root mode and the rootless bridge prefix in rootless mode
+- stage 2 step 6: rootless mode runs agent-binary-read-only-in-sandbox (write open refused, --version runs) instead of agent-binary-root-owned; root mode unchanged
+- stage 2 step 6: hostconfig import dropped (unused)
 
 ## Final audit (step 13)
 

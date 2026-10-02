@@ -196,9 +196,10 @@ class RootlessRuntime(NativeRuntime):
                   '--remount-ro', '/run']
         binds = ['--bind', str(self.remote), str(self.remote),
                  *(item for path in read_only for item in ('--ro-bind', str(self.remote / path), str(self.remote / path)))]
-        binary = Path(self.agent.binary).resolve().parent
-        if binary.is_relative_to('/home') or binary.is_relative_to('/tmp') or binary.is_relative_to('/var'):
-            binds += ['--ro-bind', str(binary), str(binary)]
+        if os.path.isabs(self.agent.binary):
+            binary = Path(self.agent.binary).resolve().parent
+            if binary.is_relative_to('/home') or binary.is_relative_to('/tmp') or binary.is_relative_to('/var'):
+                binds += ['--ro-bind', str(binary), str(binary)]
         # /var is made read-only after the binds so a worker root under /var/tmp can be mounted into it.
         return ['/usr/bin/bwrap', '--unshare-user', '--unshare-pid', '--unshare-ipc', '--unshare-uts', '--die-with-parent',
                 '--new-session', '--ro-bind', '/', '/', '--tmpfs', '/home', '--tmpfs', '/var', '--tmpfs', '/tmp',
