@@ -21,15 +21,16 @@ run, one run at a time; each run gets a fresh agent HOME. The agent process cann
 your home directory, the controller's files or any of your credentials beyond the login files
 copied into the run and the variables you pass with `--env`.
 
-Network access is the internet only, with these denials:
+The agent task has internet access with these destination denials:
 
 - Both modes: loopback and every address of the host's own interfaces.
 - Rootless mode also: the slirp gateway, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`,
   `fe80::/10` and `fc00::/7`. There is no rule for `169.254.0.0/16` or `100.64.0.0/10`.
 - Root mode does not deny other machines on your LAN.
 
-The doctor probes loopback, the host's addresses and the slirp gateway; it does not probe other
-machines. Results come back as a copied workspace and the agent's raw output. It does not
+These rules apply to the agent task. The login-status check that runs before it (Codex and Claude
+Code profiles) and the `login` command use the host network. The doctor probes loopback, the
+host's addresses and the slirp gateway; it does not probe other machines. Results come back as a copied workspace and the agent's raw output. It does not
 control what the provider adds server-side, the agent's own use of the internet, or resource use:
 there are no CPU, memory, disk or time limits.
 
@@ -137,8 +138,9 @@ by other users in directories they can traverse; these copies satisfy both modes
 
 ## Check the host
 
-Run `sudo -v` first, in the same terminal. The doctor creates one synthetic run, executes only
-Python probes (no model call), checks every isolation property live, and removes the run.
+Run `sudo -v` first, in the same terminal. The doctor creates one synthetic run, runs the listed
+probes without a model call (with `--binary` in rootless mode it also runs the agent's
+`--version`), and removes the run.
 Replace `<version>` with the installed version.
 
 ```bash
