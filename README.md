@@ -8,11 +8,28 @@ This is the run-only sandbox extracted from worker-benchmark-kit, the author's p
 benchmark repository. The isolation code is carried over as it was verified there;
 `PROVENANCE.md` maps every carried file to its source lines and lists each edit.
 
+**Status:** an experimental reference implementation, published with the author's write-up of
+the benchmark it ran. It is verified on one host (see "Platform notes"), and no support or
+compatibility with other hosts is promised. Report security problems as described in
+`SECURITY.md`.
+
 ## What it protects against
 
-The agent process cannot read or write your home directory, the controller's files or any of
-your credentials beyond the login files copied into the run and the variables you pass with
-`--env`, and it cannot reach services on the host or the LAN. Results come back as a copied workspace and the agent's raw output. It does not
+The agent runs under a host identity separate from yours: a dedicated, locked account in root
+mode, or a subordinate uid of your user in rootless mode. The same identity is reused by every
+run, one run at a time; each run gets a fresh agent HOME. The agent process cannot read or write
+your home directory, the controller's files or any of your credentials beyond the login files
+copied into the run and the variables you pass with `--env`.
+
+Network access is the internet only, with these denials:
+
+- Both modes: loopback and every address of the host's own interfaces.
+- Rootless mode also: the slirp gateway, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`,
+  `fe80::/10` and `fc00::/7`. There is no rule for `169.254.0.0/16` or `100.64.0.0/10`.
+- Root mode does not deny other machines on your LAN.
+
+The doctor probes loopback, the host's addresses and the slirp gateway; it does not probe other
+machines. Results come back as a copied workspace and the agent's raw output. It does not
 control what the provider adds server-side, the agent's own use of the internet, or resource use:
 there are no CPU, memory, disk or time limits.
 
@@ -323,7 +340,7 @@ When your rootless `host.json` exists, `login`, `run`, `recover` and the doctor 
 - Host and LAN denial is an nftables output chain in the sandbox's network
   namespace, installed before privileges drop; it covers the host's addresses,
   loopback, the slirp gateway and the private ranges listed above. There is no
-  `IPAddressDeny`.
+  `IPAddressDeny`, and no rule for `169.254.0.0/16` or `100.64.0.0/10`.
 - Inside the sandbox `/sys` reflects the host; interface names are visible,
   interfaces are not reachable.
 - Everything else from the root-mode list still applies: no resource limits,
