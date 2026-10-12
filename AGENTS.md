@@ -10,8 +10,9 @@
   bubblewrap no longer applies.
 - Never commit credentials, staged login files, run outputs or verification
   reports. `verification/` and `sandbox-runs/` are ignored.
-- Live checks (`doctor`, `run`) need `sudo -v` first and a provisioned host.
-  Do not run them without the owner present.
+- Live checks (`doctor`, `run`) need a provisioned host. Root mode needs the
+  owner's `sudo -v` in the same terminal first; rootless mode uses no sudo at
+  runtime. Do not run them without the owner present.
 - Commits are one-line Conventional Commits in English with no attribution
   trailers. Code, comments and documentation are in English.
 - docs/history/ holds the extraction record: docs/history/PROGRESS.md is where
