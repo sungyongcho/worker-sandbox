@@ -4,7 +4,10 @@
   PROVENANCE.md maps every carried file to its source lines. Carried code is
   changed only with a recorded reason in PROVENANCE.md.
 - Keep the package minimal: standard library plus the pinned msgspec. No
-  containers, no bubblewrap, no async, no resource limits on agent execution.
+  containers, no async, no resource limits on agent execution. Root mode uses
+  systemd and a dedicated account; rootless mode nests bubblewrap inside user
+  namespaces (the Stage 2 structure in README.md). The Stage 1 ban on
+  bubblewrap no longer applies.
 - Never commit credentials, staged login files, run outputs or verification
   reports. `verification/` and `sandbox-runs/` are ignored.
 - Live checks (`doctor`, `run`) need `sudo -v` first and a provisioned host.
